@@ -1,0 +1,24 @@
+export const fa = {
+  required: (label: string) => `تکمیل «${label}» الزامی است.`,
+  minLength: (label: string, min: number) => `«${label}» باید حداقل ${min} کاراکتر باشد.`,
+  maxLength: (label: string, max: number) => `«${label}» نباید بیشتر از ${max} کاراکتر باشد.`,
+  minNumber: (label: string, min: number) => `«${label}» باید حداقل ${min} باشد.`,
+  maxNumber: (label: string, max: number) => `«${label}» نباید بیشتر از ${max} باشد.`,
+  integer: (label: string) => `«${label}» باید یک عدد صحیح باشد.`,
+  mobile: (label: string) => `«${label}» باید یک شماره همراه معتبر ۱۱ رقمی (مانند ۰۹۱۲۳۴۵۶۷۸۹) باشد.`,
+  nationalId: (label: string) => `«${label}» (کد ملی) وارد شده معتبر نیست.`,
+  postalCode: (label: string) => `«${label}» باید یک کد پستی معتبر ۱۰ رقمی باشد.`,
+  email: (label: string) => `«${label}» باید یک نشانی ایمیل معتبر باشد.`,
+  digitsOnly: (label: string) => `«${label}» فقط باید شامل ارقام باشد.`,
+  minItems: (label: string, min: number) => `حداقل ${min} مورد در «${label}» باید انتخاب شود.`,
+  maxItems: (label: string, max: number) => `حداکثر ${max} مورد در «${label}» مجاز به انتخاب است.`,
+  invalidOption: (label: string) => `گزینه انتخاب‌شده در «${label}» نامعتبر است.`,
+  invalidDate: (label: string) => `«${label}» باید یک تاریخ معتبر شمسی باشد.`,
+  minDate: (label: string, bound: string) => `«${label}» نباید قبل از تاریخ ${bound} باشد.`,
+  maxDate: (label: string, bound: string) => `«${label}» نباید بعد از تاریخ ${bound} باشد.`,
+  serverError: 'خطایی در ثبت اطلاعات در سرور رخ داده است. لطفاً لحظاتی بعد دوباره تلاش کنید.',
+  formClosed: 'این فرم در حال حاضر بسته است و امکان ثبت اطلاعات جدید وجود ندارد.',
+  unknownForm: 'فرم درخواستی یافت نشد یا غیرفعال شده است.',
+  duplicateSubmission: 'این اطلاعات قبلاً با موفقیت ثبت شده است.'
+};
+

@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["google-apps-script", "node"]
+  },
+  "include": ["src/**/*", "build.mjs"]
+}
+

@@ -1,0 +1,85 @@
+{
+  "$schema": "../src/generated/form-definition.json-schema.json",
+  "id": "employee-contact-info",
+  "version": 1,
+  "title": "به‌روزرسانی اطلاعات تماس کارکنان",
+  "description": "لطفاً اطلاعات زیر را با دقت تکمیل کنید تا در سامانه سازمانی ثبت گردد.",
+  "status": "open",
+  "closesAt": "1405/12/29",
+  "access": "public",
+  "notifyAdmins": true,
+  "submitLabel": "ثبت اطلاعات",
+  "successMessage": "اطلاعات شما با موفقیت ثبت شد. سپاس از همکاری شما 🌱",
+  "fields": [
+    {
+      "key": "fullName",
+      "type": "text",
+      "label": "نام و نام خانوادگی",
+      "required": true,
+      "minLength": 3,
+      "maxLength": 60,
+      "placeholder": "مثال: علی محمدی"
+    },
+    {
+      "key": "nationalId",
+      "type": "text",
+      "label": "کد ملی",
+      "required": true,
+      "preset": "national-id",
+      "placeholder": "ده رقم بدون خط تیره"
+    },
+    {
+      "key": "mobile",
+      "type": "tel",
+      "label": "شماره همراه",
+      "required": true,
+      "preset": "iran-mobile",
+      "placeholder": "09123456789"
+    },
+    {
+      "key": "department",
+      "type": "select",
+      "label": "واحد سازمانی",
+      "required": true,
+      "options": [
+        { "value": "it", "label": "فناوری اطلاعات و تحول دیجیتال" },
+        { "value": "hr", "label": "منابع انسانی و اداری" },
+        { "value": "finance", "label": "مالی و حسابداری" },
+        { "value": "operations", "label": "عملیات و پشتیبانی" }
+      ]
+    },
+    {
+      "key": "skills",
+      "type": "multiselect",
+      "label": "مهارت‌های تخصصی",
+      "required": false,
+      "minItems": 1,
+      "maxItems": 4,
+      "options": [
+        { "value": "excel", "label": "مایکروسافت اکسل پیشرفته" },
+        { "value": "python", "label": "برنامه‌نویسی پایتون" },
+        { "value": "management", "label": "مدیریت پروژه چابک" },
+        { "value": "design", "label": "طراحی رابط کاربری (UI/UX)" },
+        { "value": "negotiation", "label": "مذاکره و ارتباطات سازمانی" }
+      ]
+    },
+    {
+      "key": "childrenCount",
+      "type": "number",
+      "label": "تعداد فرزندان",
+      "required": false,
+      "min": 0,
+      "max": 15,
+      "integer": true,
+      "placeholder": "0"
+    },
+    {
+      "key": "birthDate",
+      "type": "jalali-date",
+      "label": "تاریخ تولد",
+      "required": true,
+      "maxDate": "today"
+    }
+  ]
+}
+

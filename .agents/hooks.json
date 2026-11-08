@@ -1,0 +1,37 @@
+{
+    "secret-guard": {
+        "PreToolUse": [{
+            "matcher": "run_command",
+            "hooks": [{
+                "type": "command",
+                "command": "node hooks/secret-guard.mjs",
+                "timeout": 5
+            }]
+        }]
+    },
+    "format-on-edit": {
+        "PostToolUse": [{
+            "matcher": "write_file|edit_file",
+            "hooks": [{
+                "type": "command",
+                "command": "node hooks/format-on-edit.mjs",
+                "timeout": 15
+            }]
+        }]
+    },
+    "session-context": {
+        "SessionStart": [{
+            "type": "command",
+            "command": "node hooks/session-context.mjs",
+            "timeout": 5
+        }]
+    },
+    "quality-gate": {
+        "enabled": false,
+        "Stop": [{
+            "type": "command",
+            "command": "node hooks/quality-gate.mjs",
+            "timeout": 60
+        }]
+    }
+}

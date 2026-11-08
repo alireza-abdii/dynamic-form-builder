@@ -1,0 +1,32 @@
+{
+  "name": "form-builder-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "100% Free, Serverless, Automated Dynamic Form Builder Ecosystem",
+  "workspaces": [
+    "shared",
+    "frontend",
+    "gas-backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w frontend",
+    "build": "npm run forms:sync && npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "forms:validate": "npm run validate -w shared",
+    "forms:sync": "npm run sync -w shared",
+    "gas:build": "npm run build -w gas-backend",
+    "gas:deploy": "node scripts/gas-deploy.mjs",
+    "tg:setup": "node scripts/telegram-setup.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "dotenv": "^16.4.7",
+    "eslint": "^9.16.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0"
+  }
+}

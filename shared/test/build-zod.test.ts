@@ -1,0 +1,97 @@
+import { describe, it, expect } from 'vitest';
+import { normalizeDigits, toPersianDigits } from '../src/validators/digits.js';
+import { isValidIranMobile, cleanIranMobile } from '../src/validators/iran-mobile.js';
+import { isValidNationalId } from '../src/validators/national-id.js';
+import { buildZodSchema } from '../src/build-zod.js';
+import type { FormDefinition } from '../src/definition.schema.js';
+
+describe('Digit Normalization & Formatting', () => {
+  it('converts Persian and Arabic numerals to ASCII', () => {
+    expect(normalizeDigits('۰۹۱۲۳۴۵۶۷۸۹')).toBe('09123456789');
+    expect(normalizeDigits('٠١٢٣٤٥٦٧٨٩')).toBe('0123456789');
+    expect(normalizeDigits('  ۱۲۳۴۵  ')).toBe('12345');
+  });
+
+  it('formats ASCII numbers to Persian numerals', () => {
+    expect(toPersianDigits('09123456789')).toBe('۰۹۱۲۳۴۵۶۷۸۹');
+    expect(toPersianDigits(1405)).toBe('۱۴۰۵');
+  });
+});
+
+describe('Iranian Mobile Validation', () => {
+  it('validates correct mobile numbers', () => {
+    expect(isValidIranMobile('09123456789')).toBe(true);
+    expect(isValidIranMobile('۰۹۱۲۳۴۵۶۷۸۹')).toBe(true);
+    expect(isValidIranMobile('+989123456789')).toBe(true);
+    expect(isValidIranMobile('00989123456789')).toBe(true);
+  });
+
+  it('rejects invalid mobile numbers', () => {
+    expect(isValidIranMobile('08123456789')).toBe(false);
+    expect(isValidIranMobile('0912345678')).toBe(false); // 10 digits
+    expect(isValidIranMobile('091234567890')).toBe(false); // 12 digits
+    expect(isValidIranMobile('abcd')).toBe(false);
+  });
+});
+
+describe('National ID Validation', () => {
+  it('validates correct national IDs with valid checksum', () => {
+    // Valid Iranian National Code test vectors
+    expect(isValidNationalId('0010359745')).toBe(true);
+    expect(isValidNationalId('۰۰۱۰۳۵۹۷۴۵')).toBe(true);
+    expect(isValidNationalId('0499370899')).toBe(true);
+    expect(isValidNationalId('0084545941')).toBe(true);
+  });
+
+  it('rejects invalid or repetitive sequences', () => {
+    expect(isValidNationalId('1111111111')).toBe(false);
+    expect(isValidNationalId('0000000000')).toBe(false);
+    expect(isValidNationalId('1234567890')).toBe(false);
+    expect(isValidNationalId('123')).toBe(false);
+  });
+});
+
+describe('Dynamic Zod Schema Builder', () => {
+  const sampleDef: FormDefinition = {
+    id: 'test-form',
+    version: 1,
+    title: 'تست',
+    status: 'open',
+    access: 'public',
+    notifyAdmins: false,
+    submitLabel: 'ارسال',
+    successMessage: 'موفق',
+    fields: [
+      { key: 'name', type: 'text', label: 'نام', required: true, minLength: 2 },
+      { key: 'phone', type: 'tel', label: 'تلفن', required: true, preset: 'iran-mobile' },
+      { key: 'score', type: 'number', label: 'امتیاز', min: 1, max: 10, integer: true }
+    ]
+  };
+
+  const schema = buildZodSchema(sampleDef);
+
+  it('validates a correct payload', () => {
+    const valid = {
+      name: 'رضا',
+      phone: '۰۹۳۵۱۲۳۴۵۶۷',
+      score: '8'
+    };
+    const res = schema.safeParse(valid);
+    expect(res.success).toBe(true);
+  });
+
+  it('fails with Persian messages on missing required fields', () => {
+    const invalid = {
+      name: '',
+      phone: '',
+      score: 5
+    };
+    const res = schema.safeParse(invalid);
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      const err = res.error.format();
+      expect(err.name?._errors[0]).toContain('الزامی');
+      expect(err.phone?._errors[0]).toContain('الزامی');
+    }
+  });
+});

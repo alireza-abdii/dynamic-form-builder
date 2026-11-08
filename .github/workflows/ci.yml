@@ -1,0 +1,42 @@
+name: CI Quality Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Form JSON Definitions
+        run: npm run forms:validate
+
+      - name: Sync Forms Registry
+        run: npm run forms:sync
+
+      - name: Strict TypeScript Verification
+        run: npm run typecheck
+
+      - name: Lint Codebase & RTL Directives
+        run: npm run lint
+
+      - name: Execute Automated Tests
+        run: npm test
+
+      - name: Build Packages (Frontend & GAS)
+        run: npm run build
+

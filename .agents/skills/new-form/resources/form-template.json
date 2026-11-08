@@ -1,0 +1,22 @@
+{
+    "$schema": "../src/generated/form-definition.json-schema.json",
+    "id": "form-id-kebab-case",
+    "version": 1,
+    "title": "عنوان فرم به فارسی",
+    "description": "توضیحات کوتاه درباره فرم و نحوه پر کردن آن",
+    "status": "open",
+    "closesAt": null,
+    "access": "public",
+    "notifyAdmins": true,
+    "submitLabel": "ثبت اطلاعات",
+    "successMessage": "اطلاعات شما با موفقیت ثبت شد. سپاس از همکاری شما 🌱",
+    "fields": [{
+        "key": "fullName",
+        "type": "text",
+        "label": "نام و نام خانوادگی",
+        "required": true,
+        "minLength": 3,
+        "maxLength": 60,
+        "placeholder": "مثال: علی احمدی"
+    }]
+}
