@@ -1,5 +1,11 @@
 #!/usr/bin/env node
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const rootDir = path.resolve(path.dirname(__filename), '..');
+dotenv.config({ path: path.join(rootDir, '.env') });
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const webhookSecret = process.env.WEBHOOK_SECRET;

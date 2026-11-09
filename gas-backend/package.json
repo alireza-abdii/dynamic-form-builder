@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
+    "deploy": "node ../scripts/gas-deploy.mjs",
+    "gas:deploy": "node ../scripts/gas-deploy.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
