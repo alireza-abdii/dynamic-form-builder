@@ -19,6 +19,7 @@
     "forms:sync": "npm run sync -w shared",
     "gas:build": "npm run build -w gas-backend",
     "gas:deploy": "node scripts/gas-deploy.mjs",
+    "gas:sync-env": "node scripts/sync-properties.mjs",
     "tg:setup": "node scripts/telegram-setup.mjs"
   },
   "devDependencies": {

@@ -2,7 +2,7 @@
  * Main Web App Request Router for Google Apps Script.
  */
 import { AVAILABLE_FORM_IDS } from '@fb/shared';
-import { getScriptConfig } from './config';
+import { getScriptConfig, setupCheck } from './config';
 import { jsonOut, tgAck, safeJson } from './http';
 import { isDuplicateTelegramUpdate } from './utils/dedupe';
 import { handleTelegramUpdate, type TelegramUpdate } from './telegram/update.handler';
@@ -22,6 +22,10 @@ export function handleDoGet(
       availableForms: AVAILABLE_FORM_IDS,
       timestamp: new Date().toISOString()
     });
+  }
+
+  if (action === 'check') {
+    return setupCheck();
   }
 
   return jsonOut({
@@ -59,7 +63,26 @@ export function handleDoPost(
     return tgAck();
   }
 
-  // 2. Client Dynamic Form Submission
+  // 2. Admin Script Properties Synchronization (?action=sync_properties)
+  if (body && typeof body === 'object' && (body as Record<string, unknown>).action === 'sync_properties') {
+    const payload = body as { action: string; secret: string; properties: Record<string, string> };
+    const currentSecret = PropertiesService.getScriptProperties().getProperty('WEBHOOK_SECRET');
+
+    // Allow sync if no secret is set yet, or provided secret matches current secret
+    if (!currentSecret || currentSecret === payload.secret) {
+      if (payload.properties && typeof payload.properties === 'object') {
+        PropertiesService.getScriptProperties().setProperties(payload.properties);
+        console.log('[router] Script properties synchronized successfully.');
+        return jsonOut({ ok: true, message: 'Script properties synchronized successfully.' });
+      }
+      return jsonOut({ ok: false, code: 'INVALID_PAYLOAD', message: 'Missing properties object.' });
+    }
+
+    console.warn('[router] Unauthorized sync_properties attempt.');
+    return jsonOut({ ok: false, code: 'UNAUTHORIZED', message: 'Unauthorized secret mismatch.' });
+  }
+
+  // 3. Client Dynamic Form Submission
   if (body && typeof body === 'object' && (body as Record<string, unknown>).action === 'submit') {
     try {
       const result = handleFormSubmission(body as SubmitRequest);

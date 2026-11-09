@@ -30,7 +30,7 @@ export function sendTelegramMessage(
   };
 
   if (options?.replyMarkup) {
-    payload.reply_markup = JSON.stringify(options.replyMarkup);
+    payload.reply_markup = options.replyMarkup;
   }
 
   try {
@@ -40,9 +40,14 @@ export function sendTelegramMessage(
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
     });
-    return res.getResponseCode() === 200;
+    const code = res.getResponseCode();
+    if (code !== 200) {
+      console.error('[telegram] Failed to send message:', code, res.getContentText());
+      return false;
+    }
+    return true;
   } catch (err) {
-    console.error('[telegram] Failed to send message:', err);
+    console.error('[telegram] Exception in sendTelegramMessage:', err);
     return false;
   }
 }

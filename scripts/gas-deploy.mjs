@@ -8,7 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const rootDir = path.resolve(path.dirname(__filename), '..');
 dotenv.config({ path: path.join(rootDir, '.env') });
 
-const deploymentId = process.env.GAS_DEPLOYMENT_ID;
+const rawDeploymentId = process.env.GAS_DEPLOYMENT_ID || '';
+const deploymentId = rawDeploymentId.split('@')[0].trim();
 
 console.log('=====================================================');
 console.log('🚀 [gas-deploy] Starting Safe Google Apps Script Deployment');

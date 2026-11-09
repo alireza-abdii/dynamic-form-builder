@@ -120,10 +120,13 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
   if (update.message?.text) {
     const msg = update.message;
     const chatId = msg.chat.id;
-    const text = (msg.text || '').trim();
+    const cleanText = (msg.text || '').trim();
+    const [rawCmd, ...restArgs] = cleanText.split(/\s+/);
+    const command = (rawCmd || '').split('@')[0]?.toLowerCase();
+    const argStr = restArgs.join(' ').trim();
 
     // Command: /whoami
-    if (text === '/whoami') {
+    if (command === '/whoami') {
       const isAdmin = isTelegramAdmin(msg.from?.id || chatId);
       const reply = `👤 <b>اطلاعات کاربر شما:</b>\n\n` +
         `• <b>شناسه چت (Chat ID):</b> <code>${chatId}</code>\n` +
@@ -135,7 +138,7 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     }
 
     // Command: /help
-    if (text === '/help') {
+    if (command === '/help') {
       const reply = `📚 <b>راهنمای دستورات ربات فرم‌ساز سازمانی:</b>\n\n` +
         `• /forms - مشاهده لیست فرم‌های فعال و گزینه‌های مدیریت\n` +
         `• /export [شناسه_فرم] - دریافت مستقیم فایل اکسل (.xlsx)\n` +
@@ -147,9 +150,8 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     }
 
     // Command: /start [param]
-    if (text.startsWith('/start')) {
-      const parts = text.split(' ');
-      const startParam = parts[1]?.trim();
+    if (command === '/start') {
+      const startParam = argStr;
 
       if (startParam && FORM_REGISTRY[startParam]) {
         const form = FORM_REGISTRY[startParam];
@@ -185,7 +187,7 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     }
 
     // Command: /forms
-    if (text === '/forms') {
+    if (command === '/forms') {
       const forms = AVAILABLE_FORM_IDS.map((id) => FORM_REGISTRY[id]).filter((f): f is typeof FORM_REGISTRY[string] => f !== undefined);
       if (forms.length === 0) {
         sendTelegramMessage(cfg.botToken, chatId, 'در حال حاضر هیچ فرمی در سامانه فعال نیست.');
@@ -198,14 +200,13 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     }
 
     // Command: /export [formId]
-    if (text.startsWith('/export')) {
+    if (command === '/export') {
       if (!isTelegramAdmin(msg.from?.id || chatId)) {
         sendTelegramMessage(cfg.botToken, chatId, '⛔ شما دسترسی مجاز برای دریافت گزارش اکسل ندارید.');
         return;
       }
 
-      const parts = text.split(' ');
-      const formId = parts[1]?.trim();
+      const formId = argStr;
 
       if (!formId) {
         // Show forms list to choose
@@ -240,14 +241,13 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     }
 
     // Command: /stats [formId]
-    if (text.startsWith('/stats')) {
+    if (command === '/stats') {
       if (!isTelegramAdmin(msg.from?.id || chatId)) {
         sendTelegramMessage(cfg.botToken, chatId, '⛔ شما دسترسی مجاز برای مشاهده آمار را ندارید.');
         return;
       }
 
-      const parts = text.split(' ');
-      const formId = parts[1]?.trim();
+      const formId = argStr;
 
       if (!formId || !FORM_REGISTRY[formId]) {
         sendTelegramMessage(cfg.botToken, chatId, 'لطفاً شناسه معتبر فرم را وارد کنید. مثال:\n<code>/stats employee-contact-info</code>');
@@ -271,6 +271,13 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
         console.error('[telegram] Stats command failed:', err);
         sendTelegramMessage(cfg.botToken, chatId, 'خطایی در دریافت آمار از برگه رخ داد.');
       }
+      return;
+    }
+
+    // Fallback for private chat messages that aren't commands
+    if (msg.chat.type === 'private') {
+      const reply = `سلام ${escapeHtml(msg.from?.first_name || '')} عزیز 🌱\n\nبرای کار با سامانه یا ثبت فرم‌ها، لطفاً از دستورات زیر استفاده کنید:\n\n• /forms - لیست فرم‌ها و دریافت خروجی\n• /help - راهنمای دستورات`;
+      sendTelegramMessage(cfg.botToken, chatId, reply);
       return;
     }
   }
