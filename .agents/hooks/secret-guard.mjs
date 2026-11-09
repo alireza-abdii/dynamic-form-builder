@@ -40,7 +40,7 @@ process.stdin.on('end', () => {
       const cmd = String(rawCmd).toLowerCase();
 
       // Enforce safe clasp deployment
-      if (cmd.includes('clasp deploy') && !cmd.includes('--deploymentid') && !cmd.includes('-i ')) {
+      if (cmd.includes('clasp deploy') && !cmd.includes('--help') && !cmd.includes('--deploymentid') && !cmd.includes('-i ')) {
         console.log(JSON.stringify({
           decision: 'deny',
           reason: 'Blocked by secret-guard: clasp deploy requires an explicit --deploymentId to prevent URL mutations. Use `npm run gas:deploy`.'

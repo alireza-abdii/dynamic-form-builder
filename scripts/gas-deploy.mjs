@@ -40,7 +40,7 @@ try {
 
     console.log(`\nStep 4: Updating deployment (${deploymentId})...`);
     const desc = `Automated update ${new Date().toISOString()}`;
-    execSync(`npx clasp update-deployment "${deploymentId}" --description "${desc}"`, {
+    execSync(`npx clasp deploy --deploymentId "${deploymentId}" --description "${desc}"`, {
         stdio: 'inherit',
         cwd: path.resolve('gas-backend')
     });
