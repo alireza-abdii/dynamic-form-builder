@@ -67,3 +67,4 @@ export function setupCheck(): GoogleAppsScript.Content.TextOutput {
   return ContentService.createTextOutput(JSON.stringify(result, null, 2))
     .setMimeType(ContentService.MimeType.JSON);
 }
+

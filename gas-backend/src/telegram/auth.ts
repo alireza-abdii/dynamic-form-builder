@@ -9,3 +9,4 @@ export function isTelegramAdmin(chatId: number | string): boolean {
   const idNum = Number(chatId);
   return cfg.adminChatIds.includes(idNum);
 }
+
