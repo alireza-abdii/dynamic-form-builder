@@ -1,0 +1,201 @@
+/**
+ * Google Sheets Data Access Layer.
+ */
+import type { FormDefinition, SubmitRequest } from '@fb/shared';
+
+export interface BaseSubmissionMeta {
+  submissionId: string;
+  jalaliDate: string;
+  isoDate: string;
+  source: string;
+  tgUserId?: number | string | undefined;
+  tgUsername?: string | undefined;
+}
+
+export const TECHNICAL_COLUMNS = [
+  { key: '__submissionId', label: 'شناسه ثبت' },
+  { key: '__jalaliDate', label: 'تاریخ ثبت (شمسی)' },
+  { key: '__isoDate', label: 'زمان ثبت (ISO)' },
+  { key: '__source', label: 'منبع' },
+  { key: '__tgUserId', label: 'شناسه تلگرام' },
+  { key: '__tgUsername', label: 'نام کاربری تلگرام' }
+];
+
+export function openSpreadsheet(spreadsheetId: string): GoogleAppsScript.Spreadsheet.Spreadsheet {
+  if (!spreadsheetId) {
+    throw new Error('SPREADSHEET_ID is not configured in Script Properties.');
+  }
+  return SpreadsheetApp.openById(spreadsheetId);
+}
+
+export function getOrCreateTab(
+  ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
+  form: FormDefinition
+): GoogleAppsScript.Spreadsheet.Sheet {
+  let sheet = ss.getSheetByName(form.id);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(form.id);
+    sheet.setRightToLeft(true);
+    sheet.setFrozenRows(1);
+
+    // Initial headers
+    const headerLabels = [
+      ...TECHNICAL_COLUMNS.map((c) => c.label),
+      ...form.fields.map((f) => f.label)
+    ];
+
+    const range = sheet.getRange(1, 1, 1, headerLabels.length);
+    range.setValues([headerLabels]);
+    range.setFontWeight('bold');
+    range.setBackground('#f1f5f9');
+    range.setHorizontalAlignment('center');
+  }
+
+  ensureHeaders(sheet, form);
+  return sheet;
+}
+
+export function ensureHeaders(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  form: FormDefinition
+): void {
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+
+  const missingLabels: string[] = [];
+  for (const field of form.fields) {
+    if (!existingHeaders.includes(field.label)) {
+      missingLabels.push(field.label);
+    }
+  }
+
+  if (missingLabels.length > 0) {
+    const startCol = lastCol + 1;
+    const range = sheet.getRange(1, startCol, 1, missingLabels.length);
+    range.setValues([missingLabels]);
+    range.setFontWeight('bold');
+    range.setBackground('#f1f5f9');
+    range.setHorizontalAlignment('center');
+  }
+}
+
+export function appendSubmissionRow(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  form: FormDefinition,
+  req: SubmitRequest,
+  meta: BaseSubmissionMeta
+): void {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return;
+
+  const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+  const rowValues: (string | number)[] = [];
+
+  // Build field value mapping by label
+  const labelToValueMap: Record<string, string | number> = {
+    'شناسه ثبت': meta.submissionId,
+    'تاریخ ثبت (شمسی)': meta.jalaliDate,
+    'زمان ثبت (ISO)': meta.isoDate,
+    'منبع': meta.source,
+    'شناسه تلگرام': meta.tgUserId ? String(meta.tgUserId) : '',
+    'نام کاربری تلگرام': meta.tgUsername ? `@${meta.tgUsername}` : ''
+  };
+
+  for (const field of form.fields) {
+    const rawVal = req.values[field.key];
+    if (rawVal === undefined || rawVal === null) {
+      labelToValueMap[field.label] = '';
+    } else if (Array.isArray(rawVal)) {
+      // For multiselect: map options to labels if possible and join
+      const labels = rawVal.map((v) => {
+        if (field.type === 'multiselect') {
+          const opt = field.options.find((o) => o.value === v);
+          return opt ? opt.label : String(v);
+        }
+        return String(v);
+      });
+      labelToValueMap[field.label] = labels.join('، ');
+    } else if (field.type === 'select') {
+      const opt = field.options.find((o) => o.value === rawVal);
+      labelToValueMap[field.label] = opt ? opt.label : String(rawVal);
+    } else if (typeof rawVal === 'number') {
+      labelToValueMap[field.label] = rawVal;
+    } else {
+      labelToValueMap[field.label] = String(rawVal);
+    }
+  }
+
+  // Populate row according to header column sequence
+  for (const header of headerRow) {
+    rowValues.push(labelToValueMap[header] !== undefined ? labelToValueMap[header]! : '');
+  }
+
+  const nextRow = sheet.getLastRow() + 1;
+  const targetRange = sheet.getRange(nextRow, 1, 1, rowValues.length);
+
+  // Set number formats: text format '@' for ID, national code, phone numbers to preserve leading zeros
+  const formats = headerRow.map((header) => {
+    if (
+      header.includes('کد ملی') ||
+      header.includes('شماره همراه') ||
+      header.includes('شناسه') ||
+      header.includes('تلفن')
+    ) {
+      return '@';
+    }
+    return '';
+  });
+
+  targetRange.setNumberFormats([formats]);
+  targetRange.setValues([rowValues]);
+}
+
+export interface TabStats {
+  formId: string;
+  totalSubmissions: number;
+  todaySubmissions: number;
+  lastSubmissionDate?: string | undefined;
+}
+
+export function getTabStats(
+  ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
+  formId: string,
+  todayJalali: string
+): TabStats {
+  const sheet = ss.getSheetByName(formId);
+  if (!sheet) {
+    return { formId, totalSubmissions: 0, todaySubmissions: 0 };
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return { formId, totalSubmissions: 0, todaySubmissions: 0 };
+  }
+
+  const totalSubmissions = lastRow - 1;
+  let todaySubmissions = 0;
+  let lastSubmissionDate: string | undefined = undefined;
+
+  // Jalali date is column 2
+  const dateValues = sheet.getRange(2, 2, totalSubmissions, 1).getValues() as string[][];
+
+  for (let i = 0; i < dateValues.length; i++) {
+    const val = dateValues[i]?.[0];
+    if (val && String(val).startsWith(todayJalali)) {
+      todaySubmissions++;
+    }
+  }
+
+  if (dateValues.length > 0) {
+    const last = dateValues[dateValues.length - 1]?.[0];
+    if (last) lastSubmissionDate = String(last);
+  }
+
+  return {
+    formId,
+    totalSubmissions,
+    todaySubmissions,
+    lastSubmissionDate
+  };
+}
