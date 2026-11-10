@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { formDefinitionSchema } from './definition.schema.js';
 
 export const submitRequestMetaSchema = z.object({
   source: z.enum(['web', 'telegram']),
@@ -43,4 +44,102 @@ export const apiResponseSchema = z.discriminatedUnion('ok', [
   apiErrorResponseSchema
 ]);
 export type ApiResponse = z.infer<typeof apiResponseSchema>;
+
+// --- Admin & Dynamic Form Schemas ---
+
+export const adminLoginRequestSchema = z.object({
+  action: z.literal('login'),
+  username: z.string().min(1),
+  password: z.string().min(1)
+});
+export type AdminLoginRequest = z.infer<typeof adminLoginRequestSchema>;
+
+export const adminLoginResponseSchema = z.object({
+  ok: z.literal(true),
+  token: z.string(),
+  expiresAt: z.number()
+});
+export type AdminLoginResponse = z.infer<typeof adminLoginResponseSchema>;
+
+export const formSummarySchema = z.object({
+  id: z.string(),
+  version: z.number(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(['open', 'closed']),
+  closesAt: z.string().nullable().optional(),
+  access: z.enum(['public', 'telegram']),
+  fieldCount: z.number(),
+  isDynamic: z.boolean(),
+  updatedAt: z.string().optional()
+});
+export type FormSummary = z.infer<typeof formSummarySchema>;
+
+export const listFormsRequestSchema = z.object({
+  action: z.literal('list_forms'),
+  token: z.string().optional()
+});
+export type ListFormsRequest = z.infer<typeof listFormsRequestSchema>;
+
+export const listFormsResponseSchema = z.object({
+  ok: z.literal(true),
+  forms: z.array(formSummarySchema)
+});
+export type ListFormsResponse = z.infer<typeof listFormsResponseSchema>;
+
+export const getFormRequestSchema = z.object({
+  action: z.literal('get_form'),
+  formId: z.string().min(1)
+});
+export type GetFormRequest = z.infer<typeof getFormRequestSchema>;
+
+export const getFormResponseSchema = z.object({
+  ok: z.literal(true),
+  form: formDefinitionSchema,
+  isDynamic: z.boolean()
+});
+export type GetFormResponse = z.infer<typeof getFormResponseSchema>;
+
+export const saveFormRequestSchema = z.object({
+  action: z.literal('save_form'),
+  token: z.string().min(1),
+  form: formDefinitionSchema
+});
+export type SaveFormRequest = z.infer<typeof saveFormRequestSchema>;
+
+export const saveFormResponseSchema = z.object({
+  ok: z.literal(true),
+  formId: z.string(),
+  version: z.number()
+});
+export type SaveFormResponse = z.infer<typeof saveFormResponseSchema>;
+
+export const deleteFormRequestSchema = z.object({
+  action: z.literal('delete_form'),
+  token: z.string().min(1),
+  formId: z.string().min(1)
+});
+export type DeleteFormRequest = z.infer<typeof deleteFormRequestSchema>;
+
+export const deleteFormResponseSchema = z.object({
+  ok: z.literal(true),
+  formId: z.string()
+});
+export type DeleteFormResponse = z.infer<typeof deleteFormResponseSchema>;
+
+export const getOptionsRequestSchema = z.object({
+  action: z.literal('get_options'),
+  formId: z.string().min(1),
+  fieldKey: z.string().min(1)
+});
+export type GetOptionsRequest = z.infer<typeof getOptionsRequestSchema>;
+
+export const getOptionsResponseSchema = z.object({
+  ok: z.literal(true),
+  options: z.array(z.object({
+    value: z.string(),
+    label: z.string()
+  }))
+});
+export type GetOptionsResponse = z.infer<typeof getOptionsResponseSchema>;
 

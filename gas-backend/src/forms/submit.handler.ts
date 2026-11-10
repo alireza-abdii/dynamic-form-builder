@@ -3,7 +3,6 @@
  */
 import type { SubmitRequest, ApiResponse } from '@fb/shared';
 import {
-  FORM_REGISTRY,
   buildZodSchema,
   fa,
   formatJalaliString,
@@ -17,19 +16,22 @@ import { verifyTelegramInitData, type VerifiedTelegramUser } from './telegram-au
 import { openSpreadsheet, getOrCreateTab, appendSubmissionRow } from '../sheets/repository';
 import { sendTelegramMessage, escapeHtml } from '../telegram/api';
 import { buildNotificationKeyboard } from '../telegram/keyboards';
+import { resolveForm } from './form-resolver';
+import { getFieldOptions } from './options.handler';
 
 export function handleFormSubmission(req: SubmitRequest): ApiResponse {
   const cfg = getScriptConfig();
 
-  // 1. Check if form is registered
-  const form = FORM_REGISTRY[req.formId];
-  if (!form) {
+  // 1. Check if form is registered (static or dynamic)
+  const resolved = resolveForm(req.formId);
+  if (!resolved) {
     return {
       ok: false,
       code: 'UNKNOWN_FORM',
       message: fa.unknownForm
     };
   }
+  const form = resolved.form;
 
   // 2. Check form status
   if (form.status === 'closed') {
@@ -108,6 +110,38 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
       message: 'برخی اطلاعات وارد شده معتبر نیستند. لطفاً خطاهای مشخص‌شده را اصلاح کنید.',
       fieldErrors
     };
+  }
+
+  // 6.1. Server-side validation for reference fields against source data
+  for (const field of form.fields) {
+    if (field.type === 'reference') {
+      const val = req.values[field.key];
+      if (val !== undefined && val !== null && val !== '') {
+        const availableOptions = getFieldOptions(field.source.formId, field.source.fieldKey);
+        const validValues = availableOptions.map((o) => o.value);
+        if (validValues.length > 0) {
+          if (Array.isArray(val)) {
+            const allExist = val.every((v) => validValues.includes(String(v)));
+            if (!allExist) {
+              return {
+                ok: false,
+                code: 'VALIDATION',
+                message: fa.referenceNotFound(field.label)
+              };
+            }
+          } else {
+            const exists = validValues.includes(String(val));
+            if (!exists) {
+              return {
+                ok: false,
+                code: 'VALIDATION',
+                message: fa.referenceNotFound(field.label)
+              };
+            }
+          }
+        }
+      }
+    }
   }
 
   // 7. Deduplication check

@@ -51,6 +51,17 @@ export function buildFieldZodSchema(field: FieldDefinition): z.ZodTypeAny {
         });
       }
 
+      if (field.pattern) {
+        try {
+          const reg = new RegExp(field.pattern);
+          schema = schema.refine((v: string) => v.length === 0 || reg.test(v), {
+            message: field.patternError || fa.invalidPattern(field.label)
+          });
+        } catch {
+          // Ignore invalid regex string
+        }
+      }
+
       return schema;
     }
 
@@ -190,6 +201,39 @@ export function buildFieldZodSchema(field: FieldDefinition): z.ZodTypeAny {
       );
 
       return schema;
+    }
+
+    case 'reference': {
+      if (field.multiple) {
+        let schema: z.ZodTypeAny = z.preprocess((val) => {
+          if (!Array.isArray(val)) return [];
+          return val.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+        }, z.array(z.string()));
+
+        if (field.required || (field.minItems !== undefined && field.minItems > 0)) {
+          const min = field.minItems ?? 1;
+          schema = schema.refine((arr: string[]) => arr.length >= min, {
+            message: fa.minItems(field.label, min)
+          });
+        }
+
+        if (field.maxItems !== undefined) {
+          const max = field.maxItems;
+          schema = schema.refine((arr: string[]) => arr.length <= max, {
+            message: fa.maxItems(field.label, max)
+          });
+        }
+
+        return schema;
+      } else {
+        let schema: z.ZodTypeAny = z.preprocess((val) => (typeof val === 'string' ? val.trim() : ''), z.string());
+
+        if (field.required) {
+          schema = schema.refine((v: string) => v.length > 0, { message: fa.required(field.label) });
+        }
+
+        return schema;
+      }
     }
 
     default:

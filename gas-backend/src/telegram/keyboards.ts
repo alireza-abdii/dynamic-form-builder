@@ -3,8 +3,14 @@
  */
 import type { FormDefinition } from '@fb/shared';
 
+export interface FormListItem {
+  id: string;
+  title: string;
+  status: 'open' | 'closed';
+}
+
 export function buildFormsListKeyboard(
-  forms: FormDefinition[],
+  forms: FormListItem[],
   publicBaseUrl?: string
 ) {
   const inline_keyboard: Array<Array<{ text: string; callback_data?: string; web_app?: { url: string }; url?: string }>> = [];

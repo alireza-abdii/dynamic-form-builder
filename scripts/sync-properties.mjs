@@ -1,15 +1,22 @@
 #!/usr/bin/env node
+
 /**
  * Automatically synchronizes configuration and secrets from local .env
  * to Google Apps Script PropertiesService via safe POST endpoint.
  */
 import dotenv from 'dotenv';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
+import {
+    fileURLToPath
+} from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
+const __filename = fileURLToPath(
+    import.meta.url);
 const rootDir = path.resolve(path.dirname(__filename), '..');
-dotenv.config({ path: path.join(rootDir, '.env') });
+dotenv.config({
+    path: path.join(rootDir, '.env')
+});
 
 const gasUrl = process.env.GAS_WEB_APP_URL;
 const webhookSecret = process.env.WEBHOOK_SECRET;
@@ -18,69 +25,79 @@ const spreadsheetId = process.env.SPREADSHEET_ID;
 const adminChatIds = process.env.ADMIN_CHAT_IDS;
 const publicBaseUrl = process.env.VITE_PUBLIC_BASE_URL;
 
+const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
+const adminPasswordHash = crypto.createHash('sha256').update(adminPassword).digest('hex');
+const sessionSecret = process.env.SESSION_SECRET || 'fb_sess_sec_4b9a1c8f3e2d5a7b0f6c2d8e4a1b5c';
+
 if (!gasUrl || gasUrl.includes('AKfycbxxxx')) {
-  console.error('❌ Error: GAS_WEB_APP_URL is not set or invalid in .env');
-  process.exit(1);
+    console.error('❌ Error: GAS_WEB_APP_URL is not set or invalid in .env');
+    process.exit(1);
 }
 
 if (!webhookSecret) {
-  console.error('❌ Error: WEBHOOK_SECRET is not configured in .env');
-  process.exit(1);
+    console.error('❌ Error: WEBHOOK_SECRET is not configured in .env');
+    process.exit(1);
 }
 
 const properties = {
-  TELEGRAM_BOT_TOKEN: botToken || '',
-  WEBHOOK_SECRET: webhookSecret || '',
-  SPREADSHEET_ID: spreadsheetId || '',
-  ADMIN_CHAT_IDS: adminChatIds || '',
-  VITE_PUBLIC_BASE_URL: publicBaseUrl || ''
+    TELEGRAM_BOT_TOKEN: botToken || '',
+    WEBHOOK_SECRET: webhookSecret || '',
+    SPREADSHEET_ID: spreadsheetId || '',
+    ADMIN_CHAT_IDS: adminChatIds || '',
+    VITE_PUBLIC_BASE_URL: publicBaseUrl || '',
+    ADMIN_USERNAME: adminUsername,
+    ADMIN_PASSWORD_HASH: adminPasswordHash,
+    SESSION_SECRET: sessionSecret
 };
 
 console.log('🔄 Synchronizing Script Properties to Google Apps Script...');
 console.log(`🎯 Target GAS Endpoint: ${gasUrl}`);
 
 async function sync() {
-  try {
-    const postPayload = {
-      action: 'sync_properties',
-      secret: webhookSecret,
-      properties
-    };
+    try {
+        const postPayload = {
+            action: 'sync_properties',
+            secret: webhookSecret,
+            properties
+        };
 
-    const res = await fetch(gasUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify(postPayload),
-      redirect: 'follow'
-    });
+        const res = await fetch(gasUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(postPayload),
+            redirect: 'follow'
+        });
 
-    const result = await res.json();
+        const result = await res.json();
 
-    if (!result.ok) {
-      console.error('❌ Property sync failed:', result);
-      process.exit(1);
+        if (!result.ok) {
+            console.error('❌ Property sync failed:', result);
+            process.exit(1);
+        }
+
+        console.log('✅ Google Apps Script Properties synchronized successfully!');
+
+        // Verify diagnostics
+        console.log('🔍 Running diagnostics check (?action=check)...');
+        const checkRes = await fetch(`${gasUrl}?action=check`, {
+            redirect: 'follow'
+        });
+        const checkData = await checkRes.json();
+
+        console.log('\n📊 Diagnostics Status:');
+        console.log(JSON.stringify(checkData, null, 2));
+
+        if (checkData.checks?.TELEGRAM_BOT_TOKEN?.includes('Set') &&
+            checkData.checks?.SPREADSHEET_ID?.includes('Set')) {
+            console.log('\n🎉 ALL SYSTEMS GO! Telegram bot is ready to respond to messages and commands.');
+        }
+    } catch (err) {
+        console.error('❌ Sync failed with exception:', err);
+        process.exit(1);
     }
-
-    console.log('✅ Google Apps Script Properties synchronized successfully!');
-
-    // Verify diagnostics
-    console.log('🔍 Running diagnostics check (?action=check)...');
-    const checkRes = await fetch(`${gasUrl}?action=check`, { redirect: 'follow' });
-    const checkData = await checkRes.json();
-
-    console.log('\n📊 Diagnostics Status:');
-    console.log(JSON.stringify(checkData, null, 2));
-
-    if (checkData.checks?.TELEGRAM_BOT_TOKEN?.includes('Set') &&
-        checkData.checks?.SPREADSHEET_ID?.includes('Set')) {
-      console.log('\n🎉 ALL SYSTEMS GO! Telegram bot is ready to respond to messages and commands.');
-    }
-  } catch (err) {
-    console.error('❌ Sync failed with exception:', err);
-    process.exit(1);
-  }
 }
 
 sync();

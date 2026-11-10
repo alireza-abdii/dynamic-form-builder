@@ -94,4 +94,83 @@ describe('Dynamic Zod Schema Builder', () => {
       expect(err.phone?._errors[0]).toContain('الزامی');
     }
   });
+
+  it('validates reference field (single and multiple)', () => {
+    const refFormDef: FormDefinition = {
+      id: 'leave-request',
+      version: 1,
+      title: 'درخواست مرخصی',
+      status: 'open',
+      access: 'public',
+      notifyAdmins: false,
+      submitLabel: 'ثبت',
+      successMessage: 'ثبت شد',
+      fields: [
+        {
+          key: 'employee',
+          type: 'reference',
+          label: 'نام کارمند',
+          required: true,
+          source: { formId: 'employee-contact-info', fieldKey: 'fullName' }
+        },
+        {
+          key: 'approvers',
+          type: 'reference',
+          label: 'تأییدکنندگان',
+          required: false,
+          multiple: true,
+          minItems: 1,
+          maxItems: 3,
+          source: { formId: 'employee-contact-info', fieldKey: 'fullName' }
+        }
+      ]
+    };
+
+    const refSchema = buildZodSchema(refFormDef);
+
+    // Valid
+    const resValid = refSchema.safeParse({
+      employee: 'علی رضایی',
+      approvers: ['مدیر فنی', 'مدیر منابع انسانی']
+    });
+    expect(resValid.success).toBe(true);
+
+    // Missing required
+    const resInvalid = refSchema.safeParse({
+      employee: '',
+      approvers: []
+    });
+    expect(resInvalid.success).toBe(false);
+  });
+
+  it('validates text field with custom regex pattern', () => {
+    const patternFormDef: FormDefinition = {
+      id: 'pattern-test',
+      version: 1,
+      title: 'تست الگو',
+      status: 'open',
+      access: 'public',
+      notifyAdmins: false,
+      submitLabel: 'ثبت',
+      successMessage: 'ثبت شد',
+      fields: [
+        {
+          key: 'empCode',
+          type: 'text',
+          label: 'کد پرسنلی',
+          required: true,
+          pattern: '^EMP-\\d{4}$',
+          patternError: 'کد پرسنلی باید به فرمت EMP-1234 باشد.'
+        }
+      ]
+    };
+
+    const patSchema = buildZodSchema(patternFormDef);
+    expect(patSchema.safeParse({ empCode: 'EMP-9876' }).success).toBe(true);
+    const fail = patSchema.safeParse({ empCode: 'INVALID' });
+    expect(fail.success).toBe(false);
+    if (!fail.success) {
+      expect(fail.error.format().empCode?._errors[0]).toBe('کد پرسنلی باید به فرمت EMP-1234 باشد.');
+    }
+  });
 });

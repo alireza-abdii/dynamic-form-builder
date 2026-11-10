@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useParams } from 'react-router-dom';
 import type { FormDefinition } from '@fb/shared';
 import { LAZY_FORM_LOADERS, FORM_REGISTRY, getTodayJalali, formatJalaliString } from '@fb/shared';
+import { getForm } from '@/lib/api/gas-client';
 import { DynamicForm } from '@/components/form-engine/DynamicForm';
 import { FormClosedPage } from './FormClosedPage';
 import { NotFoundPage } from './NotFoundPage';
@@ -23,19 +24,34 @@ export function FormPage() {
     }
 
     const loader = LAZY_FORM_LOADERS[formId];
-    if (!loader) {
-      setDefinition(null);
-      setIsLoading(false);
+    if (loader) {
+      setIsLoading(true);
+      loader()
+        .then((def) => {
+          setDefinition(def);
+        })
+        .catch((err) => {
+          console.error('[FormPage] Failed to load form definition:', err);
+          setDefinition(null);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
       return;
     }
 
+    // Try dynamic form fetch from backend
     setIsLoading(true);
-    loader()
-      .then((def) => {
-        setDefinition(def);
+    getForm(formId)
+      .then((res) => {
+        if (res?.form) {
+          setDefinition(res.form);
+        } else {
+          setDefinition(null);
+        }
       })
       .catch((err) => {
-        console.error('[FormPage] Failed to load form definition:', err);
+        console.error('[FormPage] Failed to fetch dynamic form:', err);
         setDefinition(null);
       })
       .finally(() => {

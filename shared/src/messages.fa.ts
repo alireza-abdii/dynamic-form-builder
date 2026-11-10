@@ -16,9 +16,15 @@ export const fa = {
   invalidDate: (label: string) => `«${label}» باید یک تاریخ معتبر شمسی باشد.`,
   minDate: (label: string, bound: string) => `«${label}» نباید قبل از تاریخ ${bound} باشد.`,
   maxDate: (label: string, bound: string) => `«${label}» نباید بعد از تاریخ ${bound} باشد.`,
+  invalidPattern: (label: string) => `الگوی ورودی در «${label}» نامعتبر است.`,
+  referenceNotFound: (label: string) => `مقدار انتخاب‌شده برای «${label}» در سامانه مرجع یافت نشد.`,
   serverError: 'خطایی در ثبت اطلاعات در سرور رخ داده است. لطفاً لحظاتی بعد دوباره تلاش کنید.',
   formClosed: 'این فرم در حال حاضر بسته است و امکان ثبت اطلاعات جدید وجود ندارد.',
   unknownForm: 'فرم درخواستی یافت نشد یا غیرفعال شده است.',
-  duplicateSubmission: 'این اطلاعات قبلاً با موفقیت ثبت شده است.'
+  duplicateSubmission: 'این اطلاعات قبلاً با موفقیت ثبت شده است.',
+  unauthorized: 'دسترسی غیرمجاز. لطفاً ابتدا وارد حساب کاربری مدیر شوید.',
+  invalidCredentials: 'نام کاربری یا رمز عبور اشتباه است.',
+  formSavedSuccess: 'فرم با موفقیت ذخیره شد.',
+  formDeletedSuccess: 'فرم با موفقیت حذف شد.'
 };
 

@@ -1,7 +1,7 @@
 /**
  * Telegram Update Dispatcher and Command Handlers.
  */
-import { FORM_REGISTRY, AVAILABLE_FORM_IDS, formatJalaliString, getTodayJalali, toPersianDigits } from '@fb/shared';
+import { formatJalaliString, getTodayJalali, toPersianDigits } from '@fb/shared';
 import { getScriptConfig } from '../config';
 import {
   sendTelegramMessage,
@@ -14,6 +14,7 @@ import { isTelegramAdmin } from './auth';
 import { buildFormsListKeyboard } from './keyboards';
 import { openSpreadsheet, getTabStats } from '../sheets/repository';
 import { exportTabToXlsxBlob } from '../export/xlsx-exporter';
+import { resolveForm, listAllForms } from '../forms/form-resolver';
 
 export interface TelegramUpdate {
   update_id: number;
@@ -76,8 +77,8 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
       try {
         const ss = openSpreadsheet(cfg.spreadsheetId);
         const blob = exportTabToXlsxBlob(ss, formId);
-        const form = FORM_REGISTRY[formId];
-        const title = form ? form.title : formId;
+        const resolved = resolveForm(formId);
+        const title = resolved ? resolved.form.title : formId;
         const caption = `📊 <b>خروجی اکسل فرم:</b> ${escapeHtml(title)}\n📅 <b>تاریخ صدور:</b> ${toPersianDigits(formatJalaliString(getTodayJalali().jy, getTodayJalali().jm, getTodayJalali().jd))}`;
 
         sendTelegramDocument(cfg.botToken, chatId, blob, caption);
@@ -98,9 +99,9 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
         const today = getTodayJalali();
         const todayStr = formatJalaliString(today.jy, today.jm, today.jd);
         const stats = getTabStats(ss, formId, todayStr);
-        const form = FORM_REGISTRY[formId];
+        const resolved = resolveForm(formId);
 
-        const text = `📊 <b>آمار ثبت پاسخ‌های فرم «${escapeHtml(form?.title || formId)}»</b>\n\n` +
+        const text = `📊 <b>آمار ثبت پاسخ‌های فرم «${escapeHtml(resolved?.form.title || formId)}»</b>\n\n` +
           `• <b>کل پاسخ‌های ثبت‌شده:</b> ${toPersianDigits(stats.totalSubmissions)} مورد\n` +
           `• <b>ثبت‌شده‌های امروز:</b> ${toPersianDigits(stats.todaySubmissions)} مورد\n` +
           (stats.lastSubmissionDate ? `• <b>آخرین ثبت:</b> ${toPersianDigits(stats.lastSubmissionDate)}\n` : '');
@@ -153,31 +154,34 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     if (command === '/start') {
       const startParam = argStr;
 
-      if (startParam && FORM_REGISTRY[startParam]) {
-        const form = FORM_REGISTRY[startParam];
-        const formUrl = cfg.publicBaseUrl ? `${cfg.publicBaseUrl}/f/${form.id}` : undefined;
-        const reply = `سلام ${escapeHtml(msg.from?.first_name || '')} عزیز 🌱\n\n` +
-          `برای تکمیل فرم <b>«${escapeHtml(form.title)}»</b> روی دکمه زیر کلیک کنید:`;
+      if (startParam) {
+        const resolved = resolveForm(startParam);
+        if (resolved) {
+          const form = resolved.form;
+          const formUrl = cfg.publicBaseUrl ? `${cfg.publicBaseUrl}/f/${form.id}` : undefined;
+          const reply = `سلام ${escapeHtml(msg.from?.first_name || '')} عزیز 🌱\n\n` +
+            `برای تکمیل فرم <b>«${escapeHtml(form.title)}»</b> روی دکمه زیر کلیک کنید:`;
 
-        const keyboard = formUrl
-          ? {
-              inline_keyboard: [
-                [
-                  {
-                    text: `📝 تکمیل ${form.title}`,
-                    web_app: { url: formUrl }
-                  }
+          const keyboard = formUrl
+            ? {
+                inline_keyboard: [
+                  [
+                    {
+                      text: `📝 تکمیل ${form.title}`,
+                      web_app: { url: formUrl }
+                    }
+                  ]
                 ]
-              ]
-            }
-          : undefined;
+              }
+            : undefined;
 
-        sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: keyboard });
-        return;
+          sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: keyboard });
+          return;
+        }
       }
 
       // Default welcome
-      const forms = AVAILABLE_FORM_IDS.map((id) => FORM_REGISTRY[id]).filter((f): f is typeof FORM_REGISTRY[string] => f !== undefined);
+      const forms = listAllForms();
       const reply = `سلام ${escapeHtml(msg.from?.first_name || '')} عزیز، به سامانه فرم‌های سازمانی خوش آمدید 🌱\n\n` +
         `جهت مشاهده لیست فرم‌ها یا دریافت خروجی اکسل، از دستورات زیر یا دکمه‌های منو استفاده کنید:`;
 
@@ -188,7 +192,7 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
 
     // Command: /forms
     if (command === '/forms') {
-      const forms = AVAILABLE_FORM_IDS.map((id) => FORM_REGISTRY[id]).filter((f): f is typeof FORM_REGISTRY[string] => f !== undefined);
+      const forms = listAllForms();
       if (forms.length === 0) {
         sendTelegramMessage(cfg.botToken, chatId, 'در حال حاضر هیچ فرمی در سامانه فعال نیست.');
         return;
@@ -210,14 +214,15 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
 
       if (!formId) {
         // Show forms list to choose
-        const forms = AVAILABLE_FORM_IDS.map((id) => FORM_REGISTRY[id]).filter((f): f is typeof FORM_REGISTRY[string] => f !== undefined);
+        const forms = listAllForms();
         const reply = `لطفاً شناسه فرم را مشخص کنید، یا از لیست زیر دکمه خروجی اکسل را انتخاب کنید:`;
         const keyboard = buildFormsListKeyboard(forms, cfg.publicBaseUrl);
         sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: keyboard });
         return;
       }
 
-      if (!FORM_REGISTRY[formId]) {
+      const resolved = resolveForm(formId);
+      if (!resolved) {
         sendTelegramMessage(cfg.botToken, chatId, `❌ فرمی با شناسه «${escapeHtml(formId)}» یافت نشد.`);
         return;
       }
@@ -227,8 +232,7 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
       try {
         const ss = openSpreadsheet(cfg.spreadsheetId);
         const blob = exportTabToXlsxBlob(ss, formId);
-        const form = FORM_REGISTRY[formId];
-        const title = form ? form.title : formId;
+        const title = resolved.form.title;
         const caption = `📊 <b>خروجی اکسل فرم:</b> ${escapeHtml(title)}\n📅 <b>تاریخ صدور:</b> ${toPersianDigits(formatJalaliString(getTodayJalali().jy, getTodayJalali().jm, getTodayJalali().jd))}`;
 
         sendTelegramDocument(cfg.botToken, chatId, blob, caption);
@@ -248,8 +252,9 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
       }
 
       const formId = argStr;
+      const resolved = formId ? resolveForm(formId) : null;
 
-      if (!formId || !FORM_REGISTRY[formId]) {
+      if (!formId || !resolved) {
         sendTelegramMessage(cfg.botToken, chatId, 'لطفاً شناسه معتبر فرم را وارد کنید. مثال:\n<code>/stats employee-contact-info</code>');
         return;
       }
@@ -259,9 +264,9 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
         const today = getTodayJalali();
         const todayStr = formatJalaliString(today.jy, today.jm, today.jd);
         const stats = getTabStats(ss, formId, todayStr);
-        const form = FORM_REGISTRY[formId];
+        const title = resolved.form.title;
 
-        const reply = `📊 <b>آمار ثبت پاسخ‌های فرم «${escapeHtml(form?.title || formId)}»</b>\n\n` +
+        const reply = `📊 <b>آمار ثبت پاسخ‌های فرم «${escapeHtml(title)}»</b>\n\n` +
           `• <b>کل پاسخ‌های ثبت‌شده:</b> ${toPersianDigits(stats.totalSubmissions)} مورد\n` +
           `• <b>ثبت‌شده‌های امروز:</b> ${toPersianDigits(stats.todaySubmissions)} مورد\n` +
           (stats.lastSubmissionDate ? `• <b>آخرین ثبت:</b> ${toPersianDigits(stats.lastSubmissionDate)}\n` : '');

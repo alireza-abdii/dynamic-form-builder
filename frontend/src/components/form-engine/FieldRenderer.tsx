@@ -8,6 +8,7 @@ import { TelField } from './fields/TelField';
 import { SelectField } from './fields/SelectField';
 import { MultiSelectField } from './fields/MultiSelectField';
 import { JalaliDateField } from './fields/JalaliDateField';
+import { ReferenceField } from './fields/ReferenceField';
 
 interface FieldRendererProps {
   field: FieldDefinition;
@@ -29,6 +30,8 @@ export function FieldRenderer({ field }: FieldRendererProps) {
       return <MultiSelectField field={field} />;
     case 'jalali-date':
       return <JalaliDateField field={field} />;
+    case 'reference':
+      return <ReferenceField field={field} />;
     default:
       return assertNever(field);
   }

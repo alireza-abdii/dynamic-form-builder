@@ -29,7 +29,9 @@ export const textFieldSchema = baseFieldSchema.extend({
   type: z.literal('text'),
   minLength: z.number().int().nonnegative().optional(),
   maxLength: z.number().int().positive().optional(),
-  preset: presetEnum.optional()
+  preset: presetEnum.optional(),
+  pattern: z.string().optional(),
+  patternError: z.string().optional()
 });
 
 export const textareaFieldSchema = baseFieldSchema.extend({
@@ -69,6 +71,17 @@ export const jalaliDateFieldSchema = baseFieldSchema.extend({
   maxDate: z.string().optional()  // 'today' or 'YYYY/MM/DD'
 });
 
+export const referenceFieldSchema = baseFieldSchema.extend({
+  type: z.literal('reference'),
+  source: z.object({
+    formId: z.string().min(1, 'شناسه فرم مبدأ الزامی است.'),
+    fieldKey: z.string().min(1, 'فیلد مرجع در فرم مبدأ الزامی است.')
+  }),
+  multiple: z.boolean().optional(),
+  minItems: z.number().int().nonnegative().optional(),
+  maxItems: z.number().int().positive().optional()
+});
+
 export const fieldDefinitionSchema = z.discriminatedUnion('type', [
   textFieldSchema,
   textareaFieldSchema,
@@ -76,17 +89,18 @@ export const fieldDefinitionSchema = z.discriminatedUnion('type', [
   telFieldSchema,
   selectFieldSchema,
   multiSelectFieldSchema,
-  jalaliDateFieldSchema
+  jalaliDateFieldSchema,
+  referenceFieldSchema
 ]);
 export type FieldDefinition = z.infer<typeof fieldDefinitionSchema>;
 
 export const formDefinitionSchema = z.object({
   $schema: z.string().optional(),
   id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-    message: 'Form id must be lowercase kebab-case (ASCII, max 40 chars).'
+    message: 'شناسه فرم باید به صورت kebab-case با حروف کوچک انگلیسی باشد (حداکثر ۴۰ کاراکتر).'
   }).max(40),
   version: z.number().int().positive().default(1),
-  title: z.string().min(1, 'Title cannot be empty.'),
+  title: z.string().min(1, 'عنوان فرم نمی‌تواند خالی باشد.'),
   description: z.string().optional(),
   status: z.enum(['open', 'closed']).default('open'),
   closesAt: z.string().nullable().optional(),
@@ -94,6 +108,46 @@ export const formDefinitionSchema = z.object({
   notifyAdmins: z.boolean().default(true),
   submitLabel: z.string().default('ثبت اطلاعات'),
   successMessage: z.string().default('اطلاعات شما با موفقیت ثبت شد. سپاس 🌱'),
-  fields: z.array(fieldDefinitionSchema).min(1, 'Form must contain at least one field.')
+  fields: z.array(fieldDefinitionSchema).min(1, 'فرم باید حداقل دارای یک فیلد باشد.')
+}).superRefine((data, ctx) => {
+  const keys = new Set<string>();
+  data.fields.forEach((field, index) => {
+    if (keys.has(field.key)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `شناسه فیلد (key) «${field.key}» تکراری است.`,
+        path: ['fields', index, 'key']
+      });
+    }
+    keys.add(field.key);
+
+    if (field.type === 'text' || field.type === 'textarea') {
+      if (field.minLength !== undefined && field.maxLength !== undefined && field.minLength > field.maxLength) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'حداقل طول کاراکتر نمی‌تواند از حداکثر طول بیشتر باشد.',
+          path: ['fields', index, 'minLength']
+        });
+      }
+    }
+    if (field.type === 'number') {
+      if (field.min !== undefined && field.max !== undefined && field.min > field.max) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'حداقل مقدار عددی نمی‌تواند از حداکثر مقدار بیشتر باشد.',
+          path: ['fields', index, 'min']
+        });
+      }
+    }
+    if (field.type === 'multiselect' || field.type === 'reference') {
+      if (field.minItems !== undefined && field.maxItems !== undefined && field.minItems > field.maxItems) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'حداقل تعداد انتخاب نمی‌تواند از حداکثر بیشتر باشد.',
+          path: ['fields', index, 'minItems']
+        });
+      }
+    }
+  });
 });
 export type FormDefinition = z.infer<typeof formDefinitionSchema>;

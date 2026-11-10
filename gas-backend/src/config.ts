@@ -9,6 +9,9 @@ export interface AppConfig {
   adminChatIds: number[];
   spreadsheetId: string;
   publicBaseUrl: string;
+  adminUsername: string;
+  adminPasswordHash: string;
+  sessionSecret: string;
 }
 
 export function getScriptConfig(): AppConfig {
@@ -18,6 +21,9 @@ export function getScriptConfig(): AppConfig {
   const webhookSecret = props.getProperty('WEBHOOK_SECRET') || '';
   const spreadsheetId = props.getProperty('SPREADSHEET_ID') || '';
   const publicBaseUrl = props.getProperty('VITE_PUBLIC_BASE_URL') || '';
+  const adminUsername = props.getProperty('ADMIN_USERNAME') || 'admin';
+  const adminPasswordHash = props.getProperty('ADMIN_PASSWORD_HASH') || '';
+  const sessionSecret = props.getProperty('SESSION_SECRET') || '';
 
   const rawAdmins = props.getProperty('ADMIN_CHAT_IDS') || '';
   const adminChatIds = rawAdmins
@@ -32,7 +38,10 @@ export function getScriptConfig(): AppConfig {
     webhookSecret,
     adminChatIds,
     spreadsheetId,
-    publicBaseUrl
+    publicBaseUrl,
+    adminUsername,
+    adminPasswordHash,
+    sessionSecret
   };
 }
 

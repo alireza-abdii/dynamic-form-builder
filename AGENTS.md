@@ -13,7 +13,7 @@ All AI coding agents and human engineers must adhere strictly to these non-negot
 ---
 
 ## 2. Architecture & Single Source of Truth
-- **Forms Single Source of Truth:** All form definitions live exclusively under `shared/forms/<formId>.json`.
+- **Forms Single Source of Truth:** Static form definitions live under `shared/forms/<formId>.json`. Dynamic forms created by admins via the visual form builder live in Google Sheets `_forms` tab and are loaded seamlessly at runtime.
 - **Never Hand-Edit Generated Code:** Never manually edit `shared/src/generated/*`. Always run `npm run forms:sync` to regenerate schemas, types, and registry entries.
 - **Shared Code Between Frontend & GAS:** The meta-schema, field definitions, Jalali converters, Persian validation messages, and Zod schema builder live in `@fb/shared` and are bundled into both `frontend` and `gas-backend`.
 
