@@ -28,3 +28,4 @@ export function isAdminAuthenticated(): boolean {
   const token = getAdminToken();
   return Boolean(token && token.includes('.'));
 }
+

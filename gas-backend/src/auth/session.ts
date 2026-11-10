@@ -100,3 +100,4 @@ export function verifySessionToken(token: string | undefined): boolean {
     return false;
   }
 }
+

@@ -16,3 +16,4 @@ export function RequireAdmin({ children }: RequireAdminProps) {
 
   return children ? <>{children}</> : null;
 }
+
