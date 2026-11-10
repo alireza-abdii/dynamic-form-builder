@@ -7,9 +7,13 @@ import {
   fa
 } from '@fb/shared';
 
-const GAS_URL = import.meta.env.VITE_GAS_URL as string;
+const GAS_URL = (import.meta.env.VITE_GAS_URL as string) || '';
 
 async function postToGas<T>(payload: object): Promise<T> {
+  if (!GAS_URL) {
+    throw new Error('متغیر VITE_GAS_URL تنظیم نشده است. لطفاً فایل .env را بررسی کنید.');
+  }
+
   const response = await fetch(GAS_URL, {
     method: 'POST',
     headers: {
@@ -20,7 +24,7 @@ async function postToGas<T>(payload: object): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`GAS request failed with status: ${response.status}`);
+    throw new Error(`خطای ارتباط با سرور با وضعیت HTTP ${response.status}`);
   }
 
   return response.json() as Promise<T>;
