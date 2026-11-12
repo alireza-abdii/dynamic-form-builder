@@ -1,18 +1,25 @@
 /**
- * Telegram Update Dispatcher and Command Handlers.
+ * Telegram Update Dispatcher and Intelligent Command Handlers.
  */
-import { formatJalaliString, getTodayJalali, toPersianDigits } from '@fb/shared';
+import { formatJalaliString, getTodayJalali, toPersianDigits, type FormDefinition } from '@fb/shared';
 import { getScriptConfig } from '../config';
 import {
   sendTelegramMessage,
   sendTelegramDocument,
   sendTelegramChatAction,
   answerTelegramCallbackQuery,
+  editTelegramMessageText,
   escapeHtml
 } from './api';
 import { isTelegramAdmin } from './auth';
-import { buildFormsListKeyboard } from './keyboards';
-import { openSpreadsheet, getTabStats } from '../sheets/repository';
+import {
+  buildMainMenuReplyKeyboard,
+  buildFormsListKeyboard,
+  buildFormDetailKeyboard,
+  buildExportSelectionKeyboard,
+  buildStatsSelectionKeyboard
+} from './keyboards';
+import { openSpreadsheet, getTabStats, type TabStats } from '../sheets/repository';
 import { exportTabToXlsxBlob } from '../export/xlsx-exporter';
 import { resolveForm, listAllForms } from '../forms/form-resolver';
 
@@ -50,6 +57,91 @@ export interface TelegramUpdate {
   };
 }
 
+/**
+ * Format an interactive Form Detail Card with live stats and metadata.
+ */
+function renderFormDetailText(
+  form: FormDefinition,
+  stats?: TabStats | undefined,
+  isAdmin = false
+): string {
+  const statusLabel = form.status === 'open' ? '🟢 فعال و آماده پذیرش' : '🔒 بسته شده';
+  const accessLabel = form.access === 'public' ? '🌐 عمومی (وب و تلگرام)' : '📱 اختصاصی تلگرام مینی‌اپ';
+
+  let text = `📋 <b>فرم: «${escapeHtml(form.title)}»</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n`;
+
+  if (form.description) {
+    text += `💬 <b>توضیحات:</b> ${escapeHtml(form.description)}\n\n`;
+  }
+
+  text += `🆔 <b>شناسه فرم:</b> <code>${escapeHtml(form.id)}</code>\n` +
+    `🔢 <b>تعداد فیلدها:</b> ${toPersianDigits(form.fields.length)} فیلد\n` +
+    `🔒 <b>سطح دسترسی:</b> ${accessLabel}\n` +
+    `⏳ <b>وضعیت کنونی:</b> ${statusLabel}\n`;
+
+  if (isAdmin && stats) {
+    text += `──────────────────\n` +
+      `📊 <b>آمار ثبت پاسخ‌ها:</b>\n` +
+      `• مجموع ثبت‌شده: <b>${toPersianDigits(stats.totalSubmissions)}</b> مورد\n` +
+      `• ثبت‌شده‌های امروز: <b>${toPersianDigits(stats.todaySubmissions)}</b> مورد\n` +
+      (stats.lastSubmissionDate ? `• آخرین ثبت: ${toPersianDigits(stats.lastSubmissionDate)}\n` : '');
+  }
+
+  return text;
+}
+
+/**
+ * Format the welcome message with company/system header.
+ */
+function renderWelcomeText(firstName: string, isAdmin: boolean): string {
+  const roleBadge = isAdmin ? '🛡 مدیر سامانه' : '👤 کاربر گرامی';
+  return `🏢 <b>سامانه هوشمند فرم‌های سازمانی</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `سلام <b>${escapeHtml(firstName)}</b> عزیز، خوش آمدید 🌱\n\n` +
+    `نقش شما: <b>${roleBadge}</b>\n\n` +
+    `از این بستر می‌توانید فرم‌های فعال سازمانی را تکمیل کرده و پیگیری نمایید.\n` +
+    `جهت دسترسی سریع، از منوی دکمه‌ای پایین صفحه یا دکمه‌های زیر استفاده فرمایید:`;
+}
+
+/**
+ * Format the user profile card.
+ */
+function renderWhoamiText(
+  from: { id: number; first_name: string; last_name?: string; username?: string },
+  isAdmin: boolean
+): string {
+  const fullName = [from.first_name, from.last_name].filter(Boolean).join(' ');
+  return `👤 <b>کارت شناسایی کاربری در سامانه</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `🏷 <b>نام:</b> ${escapeHtml(fullName)}\n` +
+    `🆔 <b>شناسه عددی (Chat ID):</b> <code>${from.id}</code>\n` +
+    `📎 <b>نام کاربری:</b> ${from.username ? `@${escapeHtml(from.username)}` : '<i>تنظیم نشده</i>'}\n` +
+    `🔰 <b>سطح دسترسی:</b> ${isAdmin ? '🛡 مدیر ارشد (Admin)' : '👤 کاربر استاندارد'}\n` +
+    `──────────────────\n` +
+    (isAdmin
+      ? '✅ <b>دسترسی مدیریتی فعال است:</b> شما مجاز به مشاهده آمار زنده، دانلود فایل اکسل سابمیشن‌ها و نظارت بر فرم‌ها هستید.'
+      : 'ℹ️ دسترسی شما عادی است. در صورت نیاز به اختیارات مدیریتی، شناسه عددی بالا را به مدیر سیستم اعلام فرمایید.');
+}
+
+/**
+ * Format the help guide text.
+ */
+function renderHelpText(isAdmin: boolean): string {
+  return `📚 <b>راهنمای سامانه فرم‌ساز سازمانی</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n` +
+    `برای تعامل با سامانه می‌توانید از دکمه‌های منوی پایین صفحه یا دستورات زیر استفاده کنید:\n\n` +
+    `📋 <b>/forms</b> - مشاهده فهرست فرم‌های فعال و تکمیل آنلاین\n` +
+    (isAdmin
+      ? `📊 <b>/stats</b> - گزارش زنده آمار ثبت‌شده‌ها به تفکیک فرم\n` +
+        `📥 <b>/export</b> - دریافت مستقیم فایل اکسل (.xlsx) پاسخ‌ها\n`
+      : '') +
+    `👤 <b>/whoami</b> - مشاهده مشخصات کاربری و وضعیت دسترسی\n` +
+    `❓ <b>/help</b> - نمایش این پیام راهنما\n` +
+    `──────────────────\n` +
+    `💡 <i>نکته: با کلیک روی دکمه Menu در پایین چت تلگرام، می‌توانید در هر زمان مینی‌اپ را مستقیماً باز کنید.</i>`;
+}
+
 export function handleTelegramUpdate(update: TelegramUpdate): void {
   const cfg = getScriptConfig();
   if (!cfg.botToken) {
@@ -57,21 +149,25 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     return;
   }
 
+  // =========================================================================
   // 1. Handle Callback Queries (Inline Button Clicks)
+  // =========================================================================
   if (update.callback_query) {
     const cq = update.callback_query;
     const chatId = cq.message?.chat.id || cq.from.id;
+    const messageId = cq.message?.message_id;
     const data = cq.data || '';
+    const isAdmin = isTelegramAdmin(cq.from.id);
 
-    // Check authorization
-    if (!isTelegramAdmin(cq.from.id)) {
-      answerTelegramCallbackQuery(cfg.botToken, cq.id, 'شما دسترسی مجاز برای دریافت گزارش ندارید.', true);
-      return;
-    }
-
+    // 1.1. Export tab to Excel (.xlsx)
     if (data.startsWith('x:')) {
+      if (!isAdmin) {
+        answerTelegramCallbackQuery(cfg.botToken, cq.id, '⛔ شما دسترسی مجاز برای دریافت گزارش اکسل ندارید.', true);
+        return;
+      }
+
       const formId = data.slice(2);
-      answerTelegramCallbackQuery(cfg.botToken, cq.id, 'در حال آماده‌سازی و ساخت فایل اکسل...');
+      answerTelegramCallbackQuery(cfg.botToken, cq.id, '⏳ در حال ساخت فایل اکسل...');
       sendTelegramChatAction(cfg.botToken, chatId, 'upload_document');
 
       try {
@@ -79,7 +175,12 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
         const blob = exportTabToXlsxBlob(ss, formId);
         const resolved = resolveForm(formId);
         const title = resolved ? resolved.form.title : formId;
-        const caption = `📊 <b>خروجی اکسل فرم:</b> ${escapeHtml(title)}\n📅 <b>تاریخ صدور:</b> ${toPersianDigits(formatJalaliString(getTodayJalali().jy, getTodayJalali().jm, getTodayJalali().jd))}`;
+        const today = getTodayJalali();
+        const dateStr = formatJalaliString(today.jy, today.jm, today.jd);
+
+        const caption = `📊 <b>خروجی اکسل فرم:</b> ${escapeHtml(title)}\n` +
+          `📅 <b>تاریخ صدور:</b> ${toPersianDigits(dateStr)}\n` +
+          `📁 <b>فرمت:</b> Microsoft Excel (.xlsx)`;
 
         sendTelegramDocument(cfg.botToken, chatId, blob, caption);
       } catch (err: unknown) {
@@ -90,7 +191,13 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
       return;
     }
 
+    // 1.2. View Stats for a form
     if (data.startsWith('s:')) {
+      if (!isAdmin) {
+        answerTelegramCallbackQuery(cfg.botToken, cq.id, '⛔ دسترسی به آمار مخصوص مدیران است.', true);
+        return;
+      }
+
       const formId = data.slice(2);
       answerTelegramCallbackQuery(cfg.botToken, cq.id);
 
@@ -100,124 +207,246 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
         const todayStr = formatJalaliString(today.jy, today.jm, today.jd);
         const stats = getTabStats(ss, formId, todayStr);
         const resolved = resolveForm(formId);
+        const title = resolved?.form.title || formId;
 
-        const text = `📊 <b>آمار ثبت پاسخ‌های فرم «${escapeHtml(resolved?.form.title || formId)}»</b>\n\n` +
+        const text = `📊 <b>گزارش آماری فرم «${escapeHtml(title)}»</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
           `• <b>کل پاسخ‌های ثبت‌شده:</b> ${toPersianDigits(stats.totalSubmissions)} مورد\n` +
           `• <b>ثبت‌شده‌های امروز:</b> ${toPersianDigits(stats.todaySubmissions)} مورد\n` +
-          (stats.lastSubmissionDate ? `• <b>آخرین ثبت:</b> ${toPersianDigits(stats.lastSubmissionDate)}\n` : '');
+          (stats.lastSubmissionDate ? `• <b>آخرین ثبت:</b> ${toPersianDigits(stats.lastSubmissionDate)}\n` : '') +
+          `──────────────────\n` +
+          `<i>جهت دانلود اطلاعات کامل، از گزینه «دریافت اکسل» استفاده نمایید.</i>`;
 
-        sendTelegramMessage(cfg.botToken, chatId, text);
+        const keyboard = {
+          inline_keyboard: [
+            [
+              { text: '📥 دانلود اکسل', callback_data: `x:${formId}` },
+              { text: '🔄 تازه‌سازی', callback_data: `s:${formId}` }
+            ],
+            [{ text: '🔙 بازگشت به کارت فرم', callback_data: `f:${formId}` }]
+          ]
+        };
+
+        if (messageId) {
+          editTelegramMessageText(cfg.botToken, chatId, messageId, text, { replyMarkup: keyboard });
+        } else {
+          sendTelegramMessage(cfg.botToken, chatId, text, { replyMarkup: keyboard });
+        }
       } catch (err: unknown) {
         console.error('[telegram] Stats callback failed:', err);
       }
       return;
     }
 
+    // 1.3. Show Form Detail Card (in-place message update!)
+    if (data.startsWith('f:') && data !== 'f:list' && data !== 'f:refresh' && data !== 'f:export_menu' && data !== 'f:stats_menu') {
+      const formId = data.slice(2);
+      const resolved = resolveForm(formId);
+
+      if (!resolved) {
+        answerTelegramCallbackQuery(cfg.botToken, cq.id, 'فرمی با این شناسه یافت نشد.', true);
+        return;
+      }
+
+      answerTelegramCallbackQuery(cfg.botToken, cq.id);
+
+      let stats: TabStats | undefined;
+      if (isAdmin) {
+        try {
+          const ss = openSpreadsheet(cfg.spreadsheetId);
+          const today = getTodayJalali();
+          const todayStr = formatJalaliString(today.jy, today.jm, today.jd);
+          stats = getTabStats(ss, formId, todayStr);
+        } catch {
+          // stats optional
+        }
+      }
+
+      const cardText = renderFormDetailText(resolved.form, stats, isAdmin);
+      const keyboard = buildFormDetailKeyboard(formId, resolved.form.status, isAdmin, cfg.publicBaseUrl);
+
+      if (messageId) {
+        editTelegramMessageText(cfg.botToken, chatId, messageId, cardText, { replyMarkup: keyboard });
+      } else {
+        sendTelegramMessage(cfg.botToken, chatId, cardText, { replyMarkup: keyboard });
+      }
+      return;
+    }
+
+    // 1.4. Return to full forms list or refresh list
+    if (data === 'f:list' || data === 'f:refresh') {
+      answerTelegramCallbackQuery(cfg.botToken, cq.id, data === 'f:refresh' ? 'لیست به‌روز شد' : undefined);
+      const forms = listAllForms();
+      const text = `📋 <b>فهرست فرم‌های سازمانی</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `برای مشاهده جزئیات، مشخصات فیلدها و تکمیل هر فرم، روی آن کلیک کنید:`;
+      const keyboard = buildFormsListKeyboard(forms, isAdmin, cfg.publicBaseUrl);
+
+      if (messageId) {
+        editTelegramMessageText(cfg.botToken, chatId, messageId, text, { replyMarkup: keyboard });
+      } else {
+        sendTelegramMessage(cfg.botToken, chatId, text, { replyMarkup: keyboard });
+      }
+      return;
+    }
+
+    // 1.5. Quick Export menu
+    if (data === 'f:export_menu') {
+      if (!isAdmin) {
+        answerTelegramCallbackQuery(cfg.botToken, cq.id, 'دسترسی محدود به مدیران است.', true);
+        return;
+      }
+      answerTelegramCallbackQuery(cfg.botToken, cq.id);
+      const forms = listAllForms();
+      const text = `📥 <b>انتخاب فرم جهت دریافت خروجی اکسل:</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `روی فرم مورد نظر کلیک کنید تا فایل .xlsx برای شما ارسال شود:`;
+      const keyboard = buildExportSelectionKeyboard(forms);
+
+      if (messageId) {
+        editTelegramMessageText(cfg.botToken, chatId, messageId, text, { replyMarkup: keyboard });
+      } else {
+        sendTelegramMessage(cfg.botToken, chatId, text, { replyMarkup: keyboard });
+      }
+      return;
+    }
+
+    // Default acknowledge
     answerTelegramCallbackQuery(cfg.botToken, cq.id);
     return;
   }
 
-  // 2. Handle Text Messages
+  // =========================================================================
+  // 2. Handle Text Messages & Intelligent Commands
+  // =========================================================================
   if (update.message?.text) {
     const msg = update.message;
     const chatId = msg.chat.id;
-    const cleanText = (msg.text || '').trim();
-    const [rawCmd, ...restArgs] = cleanText.split(/\s+/);
+    const rawText = (msg.text || '').trim();
+    const [rawCmd, ...restArgs] = rawText.split(/\s+/);
     const command = (rawCmd || '').split('@')[0]?.toLowerCase();
     const argStr = restArgs.join(' ').trim();
+    const fromUser = msg.from || { id: chatId, first_name: 'کاربر' };
+    const isAdmin = isTelegramAdmin(fromUser.id);
+    const mainMenuMarkup = buildMainMenuReplyKeyboard(isAdmin);
 
-    // Command: /whoami
-    if (command === '/whoami') {
-      const isAdmin = isTelegramAdmin(msg.from?.id || chatId);
-      const reply = `👤 <b>اطلاعات کاربر شما:</b>\n\n` +
-        `• <b>شناسه چت (Chat ID):</b> <code>${chatId}</code>\n` +
-        `• <b>نام کاربری:</b> ${msg.from?.username ? `@${msg.from.username}` : 'ندارد'}\n` +
-        `• <b>دسترسی مدیریت:</b> ${isAdmin ? '✅ مجاز (ادمین)' : '❌ کاربر عادی'}\n\n` +
-        `<i>(برای اعطای دسترسی ادمین، شناسه چت بالا را به ADMIN_CHAT_IDS اضافه کنید.)</i>`;
-      sendTelegramMessage(cfg.botToken, chatId, reply);
+    // 2.1. Command: /whoami or "👤 حساب کاربری من" / "کیستم" / "پروفایل"
+    if (
+      command === '/whoami' ||
+      rawText === '👤 حساب کاربری من' ||
+      rawText.includes('کیستم') ||
+      rawText.includes('پروفایل من')
+    ) {
+      const reply = renderWhoamiText(fromUser, isAdmin);
+      sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: mainMenuMarkup });
       return;
     }
 
-    // Command: /help
-    if (command === '/help') {
-      const reply = `📚 <b>راهنمای دستورات ربات فرم‌ساز سازمانی:</b>\n\n` +
-        `• /forms - مشاهده لیست فرم‌های فعال و گزینه‌های مدیریت\n` +
-        `• /export [شناسه_فرم] - دریافت مستقیم فایل اکسل (.xlsx)\n` +
-        `• /stats [شناسه_فرم] - مشاهده آمار و تعداد ثبت‌های فرم\n` +
-        `• /whoami - مشاهده شناسه کاربری و وضعیت دسترسی شما\n` +
-        `• /help - نمایش این پیام راهنما`;
-      sendTelegramMessage(cfg.botToken, chatId, reply);
+    // 2.2. Command: /help or "❓ راهنمای سامانه" / "راهنما" / "کمک"
+    if (
+      command === '/help' ||
+      rawText === '❓ راهنمای سامانه' ||
+      rawText === 'راهنما' ||
+      rawText === 'کمک'
+    ) {
+      const reply = renderHelpText(isAdmin);
+      sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: mainMenuMarkup });
       return;
     }
 
-    // Command: /start [param]
-    if (command === '/start') {
-      const startParam = argStr;
-
-      if (startParam) {
-        const resolved = resolveForm(startParam);
+    // 2.3. Command: /start [param] or "سلام" / "درود"
+    if (
+      command === '/start' ||
+      rawText === 'سلام' ||
+      rawText === 'درود' ||
+      rawText === 'صبح بخیر' ||
+      rawText === 'عصر بخیر' ||
+      rawText.toLowerCase() === 'hi' ||
+      rawText.toLowerCase() === 'hello'
+    ) {
+      // Deep-link direct form jump: /start <formId>
+      if (argStr) {
+        const resolved = resolveForm(argStr);
         if (resolved) {
-          const form = resolved.form;
-          const formUrl = cfg.publicBaseUrl ? `${cfg.publicBaseUrl}/f/${form.id}` : undefined;
-          const reply = `سلام ${escapeHtml(msg.from?.first_name || '')} عزیز 🌱\n\n` +
-            `برای تکمیل فرم <b>«${escapeHtml(form.title)}»</b> روی دکمه زیر کلیک کنید:`;
-
-          const keyboard = formUrl
-            ? {
-                inline_keyboard: [
-                  [
-                    {
-                      text: `📝 تکمیل ${form.title}`,
-                      web_app: { url: formUrl }
-                    }
-                  ]
-                ]
-              }
-            : undefined;
-
-          sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: keyboard });
+          let stats;
+          if (isAdmin) {
+            try {
+              const ss = openSpreadsheet(cfg.spreadsheetId);
+              const today = getTodayJalali();
+              const todayStr = formatJalaliString(today.jy, today.jm, today.jd);
+              stats = getTabStats(ss, argStr, todayStr);
+            } catch {
+              // ignore
+            }
+          }
+          const cardText = renderFormDetailText(resolved.form, stats, isAdmin);
+          const inlineKb = buildFormDetailKeyboard(resolved.form.id, resolved.form.status, isAdmin, cfg.publicBaseUrl);
+          sendTelegramMessage(cfg.botToken, chatId, cardText, { replyMarkup: inlineKb });
           return;
         }
       }
 
       // Default welcome
       const forms = listAllForms();
-      const reply = `سلام ${escapeHtml(msg.from?.first_name || '')} عزیز، به سامانه فرم‌های سازمانی خوش آمدید 🌱\n\n` +
-        `جهت مشاهده لیست فرم‌ها یا دریافت خروجی اکسل، از دستورات زیر یا دکمه‌های منو استفاده کنید:`;
+      const welcomeText = renderWelcomeText(fromUser.first_name, isAdmin);
+      const inlineKb = buildFormsListKeyboard(forms, isAdmin, cfg.publicBaseUrl);
 
-      const keyboard = buildFormsListKeyboard(forms, cfg.publicBaseUrl);
-      sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: keyboard });
+      // Send greeting with bottom reply keyboard + inline cards
+      sendTelegramMessage(cfg.botToken, chatId, welcomeText, { replyMarkup: mainMenuMarkup });
+      sendTelegramMessage(cfg.botToken, chatId, '📋 <b>فرم‌های فعال در سامانه:</b>', { replyMarkup: inlineKb });
       return;
     }
 
-    // Command: /forms
-    if (command === '/forms') {
+    // 2.4. Command: /forms or "📋 فرم‌های سازمانی" / "فرم‌ها" / "لیست فرم‌ها"
+    if (
+      command === '/forms' ||
+      rawText === '📋 فرم‌های سازمانی' ||
+      rawText === 'فرم‌ها' ||
+      rawText === 'فرم ها' ||
+      rawText === 'لیست فرم‌ها' ||
+      rawText === 'لیست فرم ها'
+    ) {
       const forms = listAllForms();
       if (forms.length === 0) {
-        sendTelegramMessage(cfg.botToken, chatId, 'در حال حاضر هیچ فرمی در سامانه فعال نیست.');
+        sendTelegramMessage(
+          cfg.botToken,
+          chatId,
+          'در حال حاضر هیچ فرم فعالی در سامانه تعریف نشده است.',
+          { replyMarkup: mainMenuMarkup }
+        );
         return;
       }
-      const reply = `📋 <b>لیست فرم‌های سازمانی فعال:</b>\nبرای هر فرم می‌توانید گزارش اکسل دریافت کرده یا آن را باز کنید:`;
-      const keyboard = buildFormsListKeyboard(forms, cfg.publicBaseUrl);
-      sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: keyboard });
+
+      const text = `📋 <b>فهرست فرم‌های سازمانی</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `برای مشاهده مشخصات، تکمیل آنلاین یا گزارش هر فرم، روی نام آن کلیک کنید:`;
+      const inlineKb = buildFormsListKeyboard(forms, isAdmin, cfg.publicBaseUrl);
+      sendTelegramMessage(cfg.botToken, chatId, text, { replyMarkup: inlineKb });
       return;
     }
 
-    // Command: /export [formId]
-    if (command === '/export') {
-      if (!isTelegramAdmin(msg.from?.id || chatId)) {
-        sendTelegramMessage(cfg.botToken, chatId, '⛔ شما دسترسی مجاز برای دریافت گزارش اکسل ندارید.');
+    // 2.5. Command: /export [formId] or "📥 دریافت اکسل"
+    if (command === '/export' || rawText === '📥 دریافت اکسل' || rawText === 'اکسل') {
+      if (!isAdmin) {
+        sendTelegramMessage(
+          cfg.botToken,
+          chatId,
+          '⛔ <b>دسترسی غیرمجاز:</b> دریافت خروجی اکسل صرفاً برای مدیران سیستم مجاز است.',
+          { replyMarkup: mainMenuMarkup }
+        );
         return;
       }
 
       const formId = argStr;
 
+      // If no formId provided, present interactive selection keyboard
       if (!formId) {
-        // Show forms list to choose
         const forms = listAllForms();
-        const reply = `لطفاً شناسه فرم را مشخص کنید، یا از لیست زیر دکمه خروجی اکسل را انتخاب کنید:`;
-        const keyboard = buildFormsListKeyboard(forms, cfg.publicBaseUrl);
-        sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: keyboard });
+        const text = `📥 <b>دریافت خروجی اکسل (.xlsx)</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `لطفاً فرم مورد نظر خود را جهت دریافت فایل انتخاب فرمایید:`;
+        const inlineKb = buildExportSelectionKeyboard(forms);
+        sendTelegramMessage(cfg.botToken, chatId, text, { replyMarkup: inlineKb });
         return;
       }
 
@@ -232,8 +461,12 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
       try {
         const ss = openSpreadsheet(cfg.spreadsheetId);
         const blob = exportTabToXlsxBlob(ss, formId);
-        const title = resolved.form.title;
-        const caption = `📊 <b>خروجی اکسل فرم:</b> ${escapeHtml(title)}\n📅 <b>تاریخ صدور:</b> ${toPersianDigits(formatJalaliString(getTodayJalali().jy, getTodayJalali().jm, getTodayJalali().jd))}`;
+        const today = getTodayJalali();
+        const dateStr = formatJalaliString(today.jy, today.jm, today.jd);
+
+        const caption = `📊 <b>خروجی اکسل فرم:</b> ${escapeHtml(resolved.form.title)}\n` +
+          `📅 <b>تاریخ صدور:</b> ${toPersianDigits(dateStr)}\n` +
+          `📁 <b>فرمت:</b> Microsoft Excel (.xlsx)`;
 
         sendTelegramDocument(cfg.botToken, chatId, blob, caption);
       } catch (err: unknown) {
@@ -244,18 +477,33 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
       return;
     }
 
-    // Command: /stats [formId]
-    if (command === '/stats') {
-      if (!isTelegramAdmin(msg.from?.id || chatId)) {
-        sendTelegramMessage(cfg.botToken, chatId, '⛔ شما دسترسی مجاز برای مشاهده آمار را ندارید.');
+    // 2.6. Command: /stats [formId] or "📊 آمار و گزارش‌ها"
+    if (command === '/stats' || rawText === '📊 آمار و گزارش‌ها' || rawText === 'آمار' || rawText === 'گزارش') {
+      if (!isAdmin) {
+        sendTelegramMessage(
+          cfg.botToken,
+          chatId,
+          '⛔ <b>دسترسی غیرمجاز:</b> مشاهده آمار اختصاصی مدیران سیستم است.',
+          { replyMarkup: mainMenuMarkup }
+        );
         return;
       }
 
       const formId = argStr;
-      const resolved = formId ? resolveForm(formId) : null;
 
-      if (!formId || !resolved) {
-        sendTelegramMessage(cfg.botToken, chatId, 'لطفاً شناسه معتبر فرم را وارد کنید. مثال:\n<code>/stats employee-contact-info</code>');
+      if (!formId) {
+        const forms = listAllForms();
+        const text = `📊 <b>مشاهده آمار ثبت پاسخ‌ها</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `لطفاً فرم مورد نظر را برای مشاهده آمار انتخاب کنید:`;
+        const inlineKb = buildStatsSelectionKeyboard(forms);
+        sendTelegramMessage(cfg.botToken, chatId, text, { replyMarkup: inlineKb });
+        return;
+      }
+
+      const resolved = resolveForm(formId);
+      if (!resolved) {
+        sendTelegramMessage(cfg.botToken, chatId, `❌ فرمی با شناسه «${escapeHtml(formId)}» یافت نشد.`);
         return;
       }
 
@@ -264,14 +512,21 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
         const today = getTodayJalali();
         const todayStr = formatJalaliString(today.jy, today.jm, today.jd);
         const stats = getTabStats(ss, formId, todayStr);
-        const title = resolved.form.title;
 
-        const reply = `📊 <b>آمار ثبت پاسخ‌های فرم «${escapeHtml(title)}»</b>\n\n` +
+        const reply = `📊 <b>گزارش آماری فرم «${escapeHtml(resolved.form.title)}»</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
           `• <b>کل پاسخ‌های ثبت‌شده:</b> ${toPersianDigits(stats.totalSubmissions)} مورد\n` +
           `• <b>ثبت‌شده‌های امروز:</b> ${toPersianDigits(stats.todaySubmissions)} مورد\n` +
           (stats.lastSubmissionDate ? `• <b>آخرین ثبت:</b> ${toPersianDigits(stats.lastSubmissionDate)}\n` : '');
 
-        sendTelegramMessage(cfg.botToken, chatId, reply);
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: '📥 دریافت اکسل این فرم', callback_data: `x:${formId}` }],
+            [{ text: '🔙 بازگشت به لیست', callback_data: 'f:list' }]
+          ]
+        };
+
+        sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: keyboard });
       } catch (err: unknown) {
         console.error('[telegram] Stats command failed:', err);
         sendTelegramMessage(cfg.botToken, chatId, 'خطایی در دریافت آمار از برگه رخ داد.');
@@ -279,10 +534,15 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
       return;
     }
 
-    // Fallback for private chat messages that aren't commands
+    // 2.7. Intelligent Conversational Fallback for Private Chats
     if (msg.chat.type === 'private') {
-      const reply = `سلام ${escapeHtml(msg.from?.first_name || '')} عزیز 🌱\n\nبرای کار با سامانه یا ثبت فرم‌ها، لطفاً از دستورات زیر استفاده کنید:\n\n• /forms - لیست فرم‌ها و دریافت خروجی\n• /help - راهنمای دستورات`;
-      sendTelegramMessage(cfg.botToken, chatId, reply);
+      const forms = listAllForms();
+      const reply = `سلام <b>${escapeHtml(fromUser.first_name)}</b> عزیز 🌱\n\n` +
+        `دستور یا پیام ارسالی مشخص نیست. برای استفاده از امکانات سامانه می‌توانید از دکمه‌های زیر یا منوی پایین صفحه استفاده فرمایید:`;
+
+      const inlineKb = buildFormsListKeyboard(forms, isAdmin, cfg.publicBaseUrl);
+      sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: mainMenuMarkup });
+      sendTelegramMessage(cfg.botToken, chatId, '📋 <b>دسترسی سریع به فرم‌ها:</b>', { replyMarkup: inlineKb });
       return;
     }
   }

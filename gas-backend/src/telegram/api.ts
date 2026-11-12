@@ -52,6 +52,46 @@ export function sendTelegramMessage(
   }
 }
 
+export function editTelegramMessageText(
+  token: string,
+  chatId: number | string,
+  messageId: number,
+  text: string,
+  options?: {
+    parseMode?: 'HTML' | 'Markdown' | undefined;
+    replyMarkup?: object | undefined;
+    disableWebPagePreview?: boolean | undefined;
+  }
+): boolean {
+  if (!token || !chatId || !messageId) return false;
+
+  const url = `https://api.telegram.org/bot${token}/editMessageText`;
+  const payload: Record<string, unknown> = {
+    chat_id: String(chatId),
+    message_id: messageId,
+    text,
+    parse_mode: options?.parseMode || 'HTML',
+    disable_web_page_preview: options?.disableWebPagePreview ?? true
+  };
+
+  if (options?.replyMarkup) {
+    payload.reply_markup = options.replyMarkup;
+  }
+
+  try {
+    const res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    return res.getResponseCode() === 200;
+  } catch (err) {
+    console.error('[telegram] Exception in editTelegramMessageText:', err);
+    return false;
+  }
+}
+
 export function sendTelegramDocument(
   token: string,
   chatId: number | string,

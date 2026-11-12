@@ -184,11 +184,13 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
         }
       }
 
-      const alertMessage = `🔔 <b>پاسخ جدید در فرم «${escapeHtml(form.title)}»</b>\n\n` +
+      const alertMessage = `🔔 <b>ثبت پاسخ جدید در سامانه</b>\n` +
+        `━━━━━━━━━━━━━━━━━━\n` +
+        `📋 <b>فرم:</b> «${escapeHtml(form.title)}»\n` +
         `📅 <b>زمان ثبت:</b> ${toPersianDigits(todayJalaliStr)}\n` +
-        `🌐 <b>منبع:</b> ${req.meta.source === 'telegram' ? 'مینی‌اپ تلگرام' : 'وبسایت'}\n` +
+        `🌐 <b>بستر ثبت:</b> ${req.meta.source === 'telegram' ? '📱 مینی‌اپ تلگرام' : '💻 وب‌سایت'}\n` +
         (verifiedUser ? `👤 <b>کاربر تلگرام:</b> ${escapeHtml(verifiedUser.first_name)} (@${verifiedUser.username || '-'})\n` : '') +
-        (previewText ? `\n<b>خلاصه ورودی:</b>\n${previewText}` : '');
+        (previewText ? `──────────────────\n📝 <b>خلاصه اطلاعات ورودی:</b>\n${previewText}` : '');
 
       const keyboard = buildNotificationKeyboard(form.id, cfg.publicBaseUrl);
 

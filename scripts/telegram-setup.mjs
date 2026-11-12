@@ -76,7 +76,12 @@ async function run() {
     // Set bot commands with Persian descriptions
     console.log('📝 Registering bot commands in Persian...');
     await api('setMyCommands', {
-        commands: [{
+        commands: [
+            {
+                command: 'start',
+                description: 'شروع به کار و منوی اصلی'
+            },
+            {
                 command: 'forms',
                 description: 'لیست فرم‌های سازمانی فعال'
             },
