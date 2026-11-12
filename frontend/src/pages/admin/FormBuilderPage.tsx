@@ -562,6 +562,8 @@ export function FormBuilderPage() {
                             <SelectContent>
                               <SelectItem value="none">ساده (بدون الگو)</SelectItem>
                               <SelectItem value="national-id">کد ملی ایران (۱۰ رقم + اعتبارسنجی الگوریتم)</SelectItem>
+                              <SelectItem value="iran-sheba">شماره شبا ایران (IR + ۲۴ رقم)</SelectItem>
+                              <SelectItem value="bank-card">شماره کارت بانکی (۱۶ رقم + اعتبارسنجی Luhn)</SelectItem>
                               <SelectItem value="email">نشانی ایمیل</SelectItem>
                               <SelectItem value="postal-code">کد پستی (۱۰ رقم)</SelectItem>
                               <SelectItem value="digits-only">فقط ارقام</SelectItem>

@@ -51,4 +51,35 @@ describe('GAS Backend Architecture & Sheets Contract', () => {
     expect(String(sampleRequest.values.nationalId).startsWith('00')).toBe(true);
     expect(String(sampleRequest.values.mobile).startsWith('09')).toBe(true);
   });
+
+  it('supports Iranian SHEBA and bank card presets in form fields', () => {
+    const bankingForm = {
+      id: 'finance-test',
+      version: 1,
+      title: 'اطلاعات پرداخت',
+      status: 'open' as const,
+      access: 'public' as const,
+      notifyAdmins: false,
+      submitLabel: 'ثبت',
+      successMessage: 'با موفقیت ثبت شد',
+      fields: [
+        {
+          key: 'sheba',
+          type: 'text' as const,
+          label: 'شماره شبا',
+          preset: 'iran-sheba' as const,
+          required: true
+        },
+        {
+          key: 'card',
+          type: 'text' as const,
+          label: 'شماره کارت',
+          preset: 'bank-card' as const
+        }
+      ]
+    };
+
+    expect(bankingForm.fields[0]?.preset).toBe('iran-sheba');
+    expect(bankingForm.fields[1]?.preset).toBe('bank-card');
+  });
 });

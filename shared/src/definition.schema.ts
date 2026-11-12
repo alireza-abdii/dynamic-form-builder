@@ -5,7 +5,9 @@ export const presetEnum = z.enum([
   'national-id',
   'email',
   'postal-code',
-  'digits-only'
+  'digits-only',
+  'iran-sheba',
+  'bank-card'
 ]);
 export type Preset = z.infer<typeof presetEnum>;
 

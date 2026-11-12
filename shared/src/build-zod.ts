@@ -4,6 +4,7 @@ import { fa } from './messages.fa.js';
 import { normalizeDigits } from './validators/digits.js';
 import { isValidIranMobile, cleanIranMobile } from './validators/iran-mobile.js';
 import { isValidNationalId } from './validators/national-id.js';
+import { isValidSheba, isValidBankCard, cleanBankInput } from './validators/iran-bank.js';
 import { parseJalaliString } from './jalali.js';
 
 export function assertNever(x: never): never {
@@ -13,7 +14,18 @@ export function assertNever(x: never): never {
 export function buildFieldZodSchema(field: FieldDefinition): z.ZodTypeAny {
   switch (field.type) {
     case 'text': {
-      let schema: z.ZodTypeAny = z.preprocess((val) => (typeof val === 'string' ? val.trim() : ''), z.string());
+      let schema: z.ZodTypeAny = z.preprocess((val) => {
+        if (typeof val !== 'string') return '';
+        const trimmed = val.trim();
+        if (field.preset === 'iran-sheba' || field.preset === 'bank-card') {
+          const cleaned = cleanBankInput(trimmed);
+          if (field.preset === 'iran-sheba' && cleaned) {
+            return cleaned.startsWith('IR') ? cleaned : `IR${cleaned}`;
+          }
+          return cleaned;
+        }
+        return trimmed;
+      }, z.string());
 
       if (field.required) {
         schema = schema.refine((v: string) => v.length > 0, { message: fa.required(field.label) });
@@ -48,6 +60,14 @@ export function buildFieldZodSchema(field: FieldDefinition): z.ZodTypeAny {
       } else if (field.preset === 'digits-only') {
         schema = schema.refine((v: string) => v.length === 0 || /^\d+$/.test(normalizeDigits(v)), {
           message: fa.digitsOnly(field.label)
+        });
+      } else if (field.preset === 'iran-sheba') {
+        schema = schema.refine((v: string) => v.length === 0 || isValidSheba(v), {
+          message: fa.sheba(field.label)
+        });
+      } else if (field.preset === 'bank-card') {
+        schema = schema.refine((v: string) => v.length === 0 || isValidBankCard(v), {
+          message: fa.bankCard(field.label)
         });
       }
 

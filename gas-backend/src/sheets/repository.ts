@@ -134,13 +134,26 @@ export function appendSubmissionRow(
   const nextRow = sheet.getLastRow() + 1;
   const targetRange = sheet.getRange(nextRow, 1, 1, rowValues.length);
 
-  // Set number formats: text format '@' for ID, national code, phone numbers to preserve leading zeros
+  // Set number formats: text format '@' for ID, national code, card, SHEBA, phone numbers to preserve leading zeros
   const formats = headerRow.map((header) => {
+    const matchingField = form.fields.find((f) => f.label === header);
+    if (matchingField) {
+      if (
+        matchingField.type === 'tel' ||
+        (matchingField.type === 'text' && matchingField.preset !== undefined)
+      ) {
+        return '@';
+      }
+    }
+
     if (
       header.includes('کد ملی') ||
       header.includes('شماره همراه') ||
       header.includes('شناسه') ||
-      header.includes('تلفن')
+      header.includes('تلفن') ||
+      header.includes('شبا') ||
+      header.includes('کارت') ||
+      header.includes('پستی')
     ) {
       return '@';
     }
