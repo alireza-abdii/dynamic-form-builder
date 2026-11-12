@@ -7,7 +7,8 @@ import {
   fa,
   formatJalaliString,
   getTodayJalali,
-  toPersianDigits
+  toPersianDigits,
+  formatCurrency
 } from '@fb/shared';
 import { getScriptConfig } from '../config';
 import { withScriptLock } from '../utils/lock';
@@ -180,7 +181,10 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
       for (const f of topFields) {
         const val = req.values[f.key];
         if (val !== undefined && val !== '') {
-          previewText += `• <b>${escapeHtml(f.label)}:</b> ${escapeHtml(String(val))}\n`;
+          const displayVal = (f.type === 'number' && f.currency && (typeof val === 'number' || typeof val === 'string'))
+            ? formatCurrency(val, f.currency)
+            : String(val);
+          previewText += `• <b>${escapeHtml(f.label)}:</b> ${escapeHtml(displayVal)}\n`;
         }
       }
 

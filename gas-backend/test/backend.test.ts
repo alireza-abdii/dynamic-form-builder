@@ -82,4 +82,29 @@ describe('GAS Backend Architecture & Sheets Contract', () => {
     expect(bankingForm.fields[0]?.preset).toBe('iran-sheba');
     expect(bankingForm.fields[1]?.preset).toBe('bank-card');
   });
+
+  it('supports currency fields with toman and rial in backend structures', () => {
+    const currencyForm = {
+      id: 'donation-test',
+      version: 1,
+      title: 'کمک نقدی',
+      status: 'open' as const,
+      access: 'public' as const,
+      notifyAdmins: false,
+      submitLabel: 'پرداخت',
+      successMessage: 'با تشکر',
+      fields: [
+        {
+          key: 'amount',
+          type: 'number' as const,
+          label: 'مبلغ پرداختی',
+          currency: 'toman' as const,
+          required: true
+        }
+      ]
+    };
+
+    expect(currencyForm.fields[0]?.type).toBe('number');
+    expect(currencyForm.fields[0]?.currency).toBe('toman');
+  });
 });

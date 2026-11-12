@@ -43,11 +43,15 @@ export const textareaFieldSchema = baseFieldSchema.extend({
   rows: z.number().int().positive().default(3).optional()
 });
 
+export const currencyEnum = z.enum(['toman', 'rial']);
+export type Currency = z.infer<typeof currencyEnum>;
+
 export const numberFieldSchema = baseFieldSchema.extend({
   type: z.literal('number'),
   min: z.number().optional(),
   max: z.number().optional(),
-  integer: z.boolean().optional()
+  integer: z.boolean().optional(),
+  currency: currencyEnum.optional()
 });
 
 export const telFieldSchema = baseFieldSchema.extend({

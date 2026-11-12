@@ -138,6 +138,9 @@ export function appendSubmissionRow(
   const formats = headerRow.map((header) => {
     const matchingField = form.fields.find((f) => f.label === header);
     if (matchingField) {
+      if (matchingField.type === 'number' && matchingField.currency) {
+        return '#,##0';
+      }
       if (
         matchingField.type === 'tel' ||
         (matchingField.type === 'text' && matchingField.preset !== undefined)

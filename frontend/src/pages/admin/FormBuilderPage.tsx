@@ -15,7 +15,7 @@ import {
   HelpCircle,
   Link2
 } from 'lucide-react';
-import { formDefinitionSchema, toPersianDigits, normalizeDigits, type FormDefinition, type FieldDefinition, type FormSummary, type Preset } from '@fb/shared';
+import { formDefinitionSchema, toPersianDigits, normalizeDigits, type FormDefinition, type FieldDefinition, type FormSummary, type Preset, type Currency } from '@fb/shared';
 import { getForm, saveForm, listForms } from '@/lib/api/gas-client';
 import { getAdminToken } from '@/lib/auth/admin-auth';
 import { DynamicForm } from '@/components/form-engine/DynamicForm';
@@ -447,6 +447,24 @@ export function FormBuilderPage() {
                 <Button size="sm" variant="secondary" onClick={() => handleAddField('number')} className="h-7 text-xs">
                   عدد
                 </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const newField: FieldDefinition = {
+                      type: 'number',
+                      key: `amount_${Date.now().toString(36)}`,
+                      label: 'مبلغ پرداختی',
+                      required: false,
+                      currency: 'toman',
+                      integer: true
+                    };
+                    setForm((prev) => ({ ...prev, fields: [...prev.fields, newField] }));
+                  }}
+                  className="h-7 text-xs"
+                >
+                  💰 مبلغ (تومان)
+                </Button>
                 <Button size="sm" variant="secondary" onClick={() => handleAddField('tel')} className="h-7 text-xs">
                   شماره موبایل
                 </Button>
@@ -647,7 +665,31 @@ export function FormBuilderPage() {
                     )}
 
                     {field.type === 'number' && (
-                      <div className="grid gap-3 sm:grid-cols-3 pt-1 border-t">
+                      <div className="grid gap-3 sm:grid-cols-4 pt-1 border-t">
+                        <div className="space-y-1">
+                          <Label className="text-xs">نوع فیلد عددی</Label>
+                          <Select
+                            value={field.currency || 'none'}
+                            onValueChange={(val) => {
+                              const currency = val === 'none' ? undefined : (val as Currency);
+                              updateField(idx, {
+                                ...field,
+                                currency,
+                                integer: currency ? true : field.integer
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="h-9 text-xs">
+                              <SelectValue placeholder="نوع فیلد..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">عدد ساده</SelectItem>
+                              <SelectItem value="toman">مبلغ مالی (تومان)</SelectItem>
+                              <SelectItem value="rial">مبلغ مالی (ریال)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
                         <div className="space-y-1">
                           <Label className="text-xs">حداقل مقدار</Label>
                           <Input
@@ -684,11 +726,14 @@ export function FormBuilderPage() {
                           <input
                             type="checkbox"
                             id={`int_${idx}`}
-                            checked={field.integer || false}
+                            disabled={Boolean(field.currency)}
+                            checked={Boolean(field.currency) || field.integer || false}
                             onChange={(e) => updateField(idx, { ...field, integer: e.target.checked })}
-                            className="rounded border-input text-primary w-4 h-4 cursor-pointer"
+                            className="rounded border-input text-primary w-4 h-4 cursor-pointer disabled:opacity-50"
                           />
-                          <Label htmlFor={`int_${idx}`} className="text-xs cursor-pointer">فقط عدد صحیح</Label>
+                          <Label htmlFor={`int_${idx}`} className="text-xs cursor-pointer">
+                            {field.currency ? 'عدد صحیح (خودکار)' : 'فقط عدد صحیح'}
+                          </Label>
                         </div>
                       </div>
                     )}

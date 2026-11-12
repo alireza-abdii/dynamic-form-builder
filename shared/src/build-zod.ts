@@ -120,7 +120,7 @@ export function buildFieldZodSchema(field: FieldDefinition): z.ZodTypeAny {
       let schema: z.ZodTypeAny = z.preprocess((val) => {
         if (val === '' || val === null || val === undefined) return undefined;
         if (typeof val === 'number') return val;
-        const norm = normalizeDigits(val);
+        const norm = normalizeDigits(val).replace(/,/g, '').trim();
         const parsed = Number(norm);
         return isNaN(parsed) ? undefined : parsed;
       }, z.number({ invalid_type_error: fa.required(field.label) }).optional());
@@ -129,7 +129,7 @@ export function buildFieldZodSchema(field: FieldDefinition): z.ZodTypeAny {
         schema = schema.refine((v: number | undefined) => v !== undefined, { message: fa.required(field.label) });
       }
 
-      if (field.integer) {
+      if (field.integer || field.currency) {
         schema = schema.refine((v: number | undefined) => v === undefined || Number.isInteger(v), {
           message: fa.integer(field.label)
         });

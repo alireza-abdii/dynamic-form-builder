@@ -224,4 +224,44 @@ describe('Dynamic Zod Schema Builder', () => {
       expect(parsed.data.score).toBe(18.5);
     }
   });
+
+  it('validates currency number fields with commas and Persian digits', () => {
+    const currencyFormDef: FormDefinition = {
+      id: 'donation',
+      version: 1,
+      title: 'کمک مالی',
+      status: 'open',
+      access: 'public',
+      notifyAdmins: false,
+      submitLabel: 'پرداخت',
+      successMessage: 'با تشکر',
+      fields: [
+        {
+          key: 'amount',
+          type: 'number',
+          label: 'مبلغ اهدایی',
+          currency: 'toman',
+          required: true,
+          min: 1000
+        }
+      ]
+    };
+
+    const schema = buildZodSchema(currencyFormDef);
+
+    // Formatted Persian currency with commas
+    const parsedWithCommas = schema.safeParse({
+      amount: '۱۵,۰۰۰,۰۰۰'
+    });
+    expect(parsedWithCommas.success).toBe(true);
+    if (parsedWithCommas.success) {
+      expect(parsedWithCommas.data.amount).toBe(15000000);
+    }
+
+    // Number below min
+    const parsedBelowMin = schema.safeParse({
+      amount: '۵۰۰'
+    });
+    expect(parsedBelowMin.success).toBe(false);
+  });
 });

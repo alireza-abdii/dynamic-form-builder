@@ -53,5 +53,39 @@ describe('Frontend Form Engine Integration', () => {
       expect(formatted.department?._errors.length).toBeGreaterThan(0);
     }
   });
+
+  it('validates currency number inputs formatted with commas and Persian digits', () => {
+    const form = {
+      id: 'currency-test',
+      version: 1,
+      title: 'تست مبلغ',
+      status: 'open' as const,
+      access: 'public' as const,
+      notifyAdmins: false,
+      submitLabel: 'ثبت',
+      successMessage: 'با موفقیت ثبت شد',
+      fields: [
+        {
+          key: 'fee',
+          type: 'number' as const,
+          label: 'هزینه دوره',
+          currency: 'toman' as const,
+          required: true,
+          min: 50000
+        }
+      ]
+    };
+
+    const schema = buildZodSchema(form);
+
+    const valid = schema.safeParse({ fee: '۲۵۰,۰۰۰' });
+    expect(valid.success).toBe(true);
+    if (valid.success) {
+      expect(valid.data.fee).toBe(250000);
+    }
+
+    const invalid = schema.safeParse({ fee: '۱۰,۰۰۰' });
+    expect(invalid.success).toBe(false);
+  });
 });
 
