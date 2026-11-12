@@ -568,6 +568,9 @@ export function FormBuilderPage() {
                               } else if (preset === 'iran-sheba') {
                                 minLength = 24;
                                 maxLength = 26;
+                              } else if (!preset) {
+                                minLength = undefined;
+                                maxLength = undefined;
                               }
 
                               updateField(idx, {
@@ -599,7 +602,15 @@ export function FormBuilderPage() {
                             type="text"
                             inputMode="numeric"
                             dir="ltr"
-                            placeholder="اختیاری"
+                            placeholder={
+                              field.preset === 'national-id' || field.preset === 'postal-code'
+                                ? '۱۰ (پیش‌فرض)'
+                                : field.preset === 'bank-card'
+                                ? '۱۶ (پیش‌فرض)'
+                                : field.preset === 'iran-sheba'
+                                ? '۲۴ (پیش‌فرض)'
+                                : 'اختیاری'
+                            }
                             value={field.minLength !== undefined ? field.minLength : ''}
                             onChange={(e) => {
                               const clean = normalizeDigits(e.target.value).replace(/[^0-9]/g, '');
@@ -615,7 +626,15 @@ export function FormBuilderPage() {
                             type="text"
                             inputMode="numeric"
                             dir="ltr"
-                            placeholder="اختیاری"
+                            placeholder={
+                              field.preset === 'national-id' || field.preset === 'postal-code'
+                                ? '۱۰ (پیش‌فرض)'
+                                : field.preset === 'bank-card'
+                                ? '۱۹ (پیش‌فرض)'
+                                : field.preset === 'iran-sheba'
+                                ? '۲۶ (پیش‌فرض)'
+                                : 'اختیاری'
+                            }
                             value={field.maxLength !== undefined ? field.maxLength : ''}
                             onChange={(e) => {
                               const clean = normalizeDigits(e.target.value).replace(/[^0-9]/g, '');
