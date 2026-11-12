@@ -24,6 +24,13 @@ export function buildFieldZodSchema(field: FieldDefinition): z.ZodTypeAny {
           }
           return cleaned;
         }
+        if (
+          field.preset === 'national-id' ||
+          field.preset === 'postal-code' ||
+          field.preset === 'digits-only'
+        ) {
+          return normalizeDigits(trimmed);
+        }
         return trimmed;
       }, z.string());
 

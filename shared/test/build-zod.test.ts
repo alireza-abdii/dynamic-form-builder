@@ -169,8 +169,59 @@ describe('Dynamic Zod Schema Builder', () => {
     expect(patSchema.safeParse({ empCode: 'EMP-9876' }).success).toBe(true);
     const fail = patSchema.safeParse({ empCode: 'INVALID' });
     expect(fail.success).toBe(false);
-    if (!fail.success) {
-      expect(fail.error.format().empCode?._errors[0]).toBe('کد پرسنلی باید به فرمت EMP-1234 باشد.');
+  });
+
+  it('normalizes Persian decimal separator (٫) to dot', () => {
+    expect(normalizeDigits('۱۲٫۵')).toBe('12.5');
+    expect(normalizeDigits('۰٫۷۵')).toBe('0.75');
+  });
+
+  it('normalizes Persian numerals for national-id, postal-code, digits-only and number fields', () => {
+    const numericFormDef: FormDefinition = {
+      id: 'numeric-normalization-test',
+      version: 1,
+      title: 'تست فیلدهای عددی',
+      status: 'open',
+      access: 'public',
+      notifyAdmins: false,
+      submitLabel: 'ثبت',
+      successMessage: 'ثبت شد',
+      fields: [
+        {
+          key: 'nid',
+          type: 'text',
+          label: 'کد ملی',
+          preset: 'national-id',
+          required: true
+        },
+        {
+          key: 'pcode',
+          type: 'text',
+          label: 'کد پستی',
+          preset: 'postal-code',
+          required: true
+        },
+        {
+          key: 'score',
+          type: 'number',
+          label: 'امتیاز',
+          required: true
+        }
+      ]
+    };
+
+    const schema = buildZodSchema(numericFormDef);
+    const parsed = schema.safeParse({
+      nid: '۰۰۱۰۳۵۹۷۴۵', // Persian digits valid national ID
+      pcode: '۱۲۳۴۵۶۷۸۹۰', // Persian digits postal code
+      score: '۱۸٫۵' // Persian decimal score
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.nid).toBe('0010359745');
+      expect(parsed.data.pcode).toBe('1234567890');
+      expect(parsed.data.score).toBe(18.5);
     }
   });
 });

@@ -152,3 +152,4 @@ export function detectBankName(raw: string, kind: 'card' | 'sheba'): string | un
   const bankCode = digits.slice(2, 5);
   return SHEBA_BANK_CODES[bankCode];
 }
+

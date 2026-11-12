@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useFormContext } from 'react-hook-form';
 import type { FieldDefinition } from '@fb/shared';
-import { toPersianDigits, detectBankName } from '@fb/shared';
+import { toPersianDigits, detectBankName, normalizeDigits } from '@fb/shared';
 import {
   FormField,
   FormItem,
@@ -21,12 +21,14 @@ export function TextField({ field }: FieldProps) {
   const value = watch(field.key) || '';
 
   const isBankPreset = field.preset === 'iran-sheba' || field.preset === 'bank-card';
-  const isLtrPreset =
+  const isNumericPreset =
     field.preset === 'national-id' ||
     field.preset === 'postal-code' ||
-    field.preset === 'email' ||
     field.preset === 'digits-only' ||
     isBankPreset;
+  const isLtrPreset =
+    field.preset === 'email' ||
+    isNumericPreset;
 
   const detectedBank = React.useMemo(() => {
     if (field.preset === 'bank-card') {
@@ -72,15 +74,14 @@ export function TextField({ field }: FieldProps) {
                 placeholder={placeholder}
                 className={isLtrPreset ? 'text-end font-mono tracking-wider' : undefined}
                 maxLength={field.maxLength}
-                inputMode={
-                  field.preset === 'bank-card' ||
-                  field.preset === 'iran-sheba' ||
-                  field.preset === 'national-id' ||
-                  field.preset === 'postal-code' ||
-                  field.preset === 'digits-only'
-                    ? 'numeric'
-                    : undefined
-                }
+                inputMode={isNumericPreset ? 'numeric' : undefined}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (isNumericPreset) {
+                    val = normalizeDigits(val);
+                  }
+                  formField.onChange(val);
+                }}
               />
             </div>
           </FormControl>

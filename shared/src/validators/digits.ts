@@ -13,6 +13,8 @@ export function normalizeDigits(input: unknown): string {
     if (fa) str = str.replaceAll(fa, String(i));
     if (ar) str = str.replaceAll(ar, String(i));
   }
+  // Replace Persian decimal separator (٫) with standard dot (.)
+  str = str.replaceAll('٫', '.');
   return str;
 }
 

@@ -15,7 +15,7 @@ import {
   HelpCircle,
   Link2
 } from 'lucide-react';
-import { formDefinitionSchema, toPersianDigits, type FormDefinition, type FieldDefinition, type FormSummary, type Preset } from '@fb/shared';
+import { formDefinitionSchema, toPersianDigits, normalizeDigits, type FormDefinition, type FieldDefinition, type FormSummary, type Preset } from '@fb/shared';
 import { getForm, saveForm, listForms } from '@/lib/api/gas-client';
 import { getAdminToken } from '@/lib/auth/admin-auth';
 import { DynamicForm } from '@/components/form-engine/DynamicForm';
@@ -554,7 +554,29 @@ export function FormBuilderPage() {
                           <Label className="text-xs">الگوی آماده (Preset)</Label>
                           <Select
                             value={field.preset || 'none'}
-                            onValueChange={(val) => updateField(idx, { ...field, preset: val === 'none' ? undefined : (val as Preset) })}
+                            onValueChange={(val) => {
+                              const preset = val === 'none' ? undefined : (val as Preset);
+                              let minLength = field.minLength;
+                              let maxLength = field.maxLength;
+
+                              if (preset === 'national-id' || preset === 'postal-code') {
+                                minLength = 10;
+                                maxLength = 10;
+                              } else if (preset === 'bank-card') {
+                                minLength = 16;
+                                maxLength = 19;
+                              } else if (preset === 'iran-sheba') {
+                                minLength = 24;
+                                maxLength = 26;
+                              }
+
+                              updateField(idx, {
+                                ...field,
+                                preset,
+                                minLength,
+                                maxLength
+                              });
+                            }}
                           >
                             <SelectTrigger className="h-9 text-xs">
                               <SelectValue placeholder="انتخاب الگو..." />
@@ -574,22 +596,32 @@ export function FormBuilderPage() {
                         <div className="space-y-1">
                           <Label className="text-xs">حداقل طول کاراکتر</Label>
                           <Input
-                            type="number"
-                            min={0}
-                            value={field.minLength ?? ''}
-                            onChange={(e) => updateField(idx, { ...field, minLength: e.target.value ? Number(e.target.value) : undefined })}
-                            className="h-9 text-xs"
+                            type="text"
+                            inputMode="numeric"
+                            dir="ltr"
+                            placeholder="اختیاری"
+                            value={field.minLength !== undefined ? field.minLength : ''}
+                            onChange={(e) => {
+                              const clean = normalizeDigits(e.target.value).replace(/[^0-9]/g, '');
+                              updateField(idx, { ...field, minLength: clean ? Number(clean) : undefined });
+                            }}
+                            className="h-9 text-xs font-mono text-end"
                           />
                         </div>
 
                         <div className="space-y-1">
                           <Label className="text-xs">حداکثر طول کاراکتر</Label>
                           <Input
-                            type="number"
-                            min={1}
-                            value={field.maxLength ?? ''}
-                            onChange={(e) => updateField(idx, { ...field, maxLength: e.target.value ? Number(e.target.value) : undefined })}
-                            className="h-9 text-xs"
+                            type="text"
+                            inputMode="numeric"
+                            dir="ltr"
+                            placeholder="اختیاری"
+                            value={field.maxLength !== undefined ? field.maxLength : ''}
+                            onChange={(e) => {
+                              const clean = normalizeDigits(e.target.value).replace(/[^0-9]/g, '');
+                              updateField(idx, { ...field, maxLength: clean ? Number(clean) : undefined });
+                            }}
+                            className="h-9 text-xs font-mono text-end"
                           />
                         </div>
                       </div>
@@ -600,20 +632,32 @@ export function FormBuilderPage() {
                         <div className="space-y-1">
                           <Label className="text-xs">حداقل مقدار</Label>
                           <Input
-                            type="number"
-                            value={field.min ?? ''}
-                            onChange={(e) => updateField(idx, { ...field, min: e.target.value ? Number(e.target.value) : undefined })}
-                            className="h-9 text-xs"
+                            type="text"
+                            inputMode="numeric"
+                            dir="ltr"
+                            placeholder="اختیاری"
+                            value={field.min !== undefined ? field.min : ''}
+                            onChange={(e) => {
+                              const clean = normalizeDigits(e.target.value).replace(/[^0-9.-]/g, '');
+                              updateField(idx, { ...field, min: clean !== '' && !isNaN(Number(clean)) ? Number(clean) : undefined });
+                            }}
+                            className="h-9 text-xs font-mono text-end"
                           />
                         </div>
 
                         <div className="space-y-1">
                           <Label className="text-xs">حداکثر مقدار</Label>
                           <Input
-                            type="number"
-                            value={field.max ?? ''}
-                            onChange={(e) => updateField(idx, { ...field, max: e.target.value ? Number(e.target.value) : undefined })}
-                            className="h-9 text-xs"
+                            type="text"
+                            inputMode="numeric"
+                            dir="ltr"
+                            placeholder="اختیاری"
+                            value={field.max !== undefined ? field.max : ''}
+                            onChange={(e) => {
+                              const clean = normalizeDigits(e.target.value).replace(/[^0-9.-]/g, '');
+                              updateField(idx, { ...field, max: clean !== '' && !isNaN(Number(clean)) ? Number(clean) : undefined });
+                            }}
+                            className="h-9 text-xs font-mono text-end"
                           />
                         </div>
 
