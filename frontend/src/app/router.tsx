@@ -7,6 +7,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { AdminLoginPage } from '@/pages/admin/AdminLoginPage';
 import { AdminFormsPage } from '@/pages/admin/AdminFormsPage';
 import { FormBuilderPage } from '@/pages/admin/FormBuilderPage';
+import { AdminSubmissionsPage } from '@/pages/admin/AdminSubmissionsPage';
 import { RequireAdmin } from '@/components/auth/RequireAdmin';
 import { useTelegram } from '@/lib/telegram/useTelegram';
 
@@ -56,6 +57,14 @@ export function AppRouter() {
           element={
             <RequireAdmin>
               <FormBuilderPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/forms/:formId/submissions"
+          element={
+            <RequireAdmin>
+              <AdminSubmissionsPage />
             </RequireAdmin>
           }
         />

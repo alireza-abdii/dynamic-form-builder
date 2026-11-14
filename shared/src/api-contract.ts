@@ -145,3 +145,20 @@ export const getOptionsResponseSchema = z.object({
 });
 export type GetOptionsResponse = z.infer<typeof getOptionsResponseSchema>;
 
+export const getSubmissionsRequestSchema = z.object({
+  action: z.literal('get_submissions'),
+  token: z.string().min(1),
+  formId: z.string().min(1)
+});
+export type GetSubmissionsRequest = z.infer<typeof getSubmissionsRequestSchema>;
+
+export const getSubmissionsResponseSchema = z.object({
+  ok: z.literal(true),
+  formId: z.string(),
+  headers: z.array(z.string()),
+  submissions: z.array(z.record(z.union([z.string(), z.number()]))),
+  total: z.number()
+});
+export type GetSubmissionsResponse = z.infer<typeof getSubmissionsResponseSchema>;
+
+

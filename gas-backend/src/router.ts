@@ -11,7 +11,7 @@ import { resolveForm, listAllForms } from './forms/form-resolver';
 import { getFieldOptions } from './forms/options.handler';
 import { saveDynamicForm, deleteDynamicForm } from './forms/dynamic-forms';
 import { verifyAdminCredentials, createSessionToken, verifySessionToken } from './auth/session';
-import { openSpreadsheet } from './sheets/repository';
+import { openSpreadsheet, getSubmissions } from './sheets/repository';
 import type { SubmitRequest, FormDefinition } from '@fb/shared';
 
 export function handleDoGet(
@@ -205,7 +205,33 @@ export function handleDoPost(
     }
   }
 
-  // 9. Client Dynamic Form Submission
+  // 9. Get Form Submissions (action === 'get_submissions' - Requires Admin Session)
+  if (body && typeof body === 'object' && (body as Record<string, unknown>).action === 'get_submissions') {
+    const payload = body as { token?: string; formId?: string };
+    if (!verifySessionToken(payload.token)) {
+      return jsonOut({ ok: false, code: 'UNAUTHORIZED', message: 'دسترسی غیرمجاز. نشست کاربری شما منقضی شده است.' });
+    }
+    if (!payload.formId) {
+      return jsonOut({ ok: false, code: 'VALIDATION', message: 'شناسه فرم مشخص نشده است.' });
+    }
+
+    try {
+      const ss = openSpreadsheet(cfg.spreadsheetId);
+      const result = getSubmissions(ss, payload.formId);
+      return jsonOut({
+        ok: true,
+        formId: payload.formId,
+        headers: result.headers,
+        submissions: result.submissions,
+        total: result.total
+      });
+    } catch (err: unknown) {
+      console.error('[router] Error fetching submissions:', err);
+      return jsonOut({ ok: false, code: 'SERVER', message: err instanceof Error ? err.message : 'خطای سرور' });
+    }
+  }
+
+  // 10. Client Dynamic Form Submission
   if (body && typeof body === 'object' && (body as Record<string, unknown>).action === 'submit') {
     try {
       const result = handleFormSubmission(body as SubmitRequest);

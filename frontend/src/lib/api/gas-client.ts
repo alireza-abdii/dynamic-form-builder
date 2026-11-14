@@ -136,6 +136,40 @@ export async function getFieldOptions(
   }
 }
 
+export async function getSubmissions(
+  formId: string,
+  token: string
+): Promise<{
+  ok: boolean;
+  headers: string[];
+  submissions: Record<string, string | number>[];
+  total: number;
+  message?: string;
+}> {
+  try {
+    const res = await postToGas<{
+      ok: boolean;
+      headers: string[];
+      submissions: Record<string, string | number>[];
+      total: number;
+      message?: string;
+    }>({
+      action: 'get_submissions',
+      token,
+      formId
+    });
+    return res;
+  } catch (err) {
+    return {
+      ok: false,
+      headers: [],
+      submissions: [],
+      total: 0,
+      message: err instanceof Error ? err.message : 'خطای ارتباط با سرور'
+    };
+  }
+}
+
 export async function submitForm(
   req: SubmitRequest,
   signal?: AbortSignal

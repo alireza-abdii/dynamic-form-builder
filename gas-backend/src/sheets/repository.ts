@@ -256,4 +256,69 @@ export function checkDuplicateValue(
   });
 }
 
+export interface SubmissionsResult {
+  headers: string[];
+  submissions: Record<string, string | number>[];
+  total: number;
+}
+
+/**
+ * Fetches all submissions from the form's sheet tab.
+ * Returns headers and row records sorted newest first.
+ */
+export function getSubmissions(
+  ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
+  formId: string
+): SubmissionsResult {
+  const sheet = ss.getSheetByName(formId);
+  if (!sheet) {
+    return { headers: [], submissions: [], total: 0 };
+  }
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastCol === 0) {
+    return { headers: [], submissions: [], total: 0 };
+  }
+
+  const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+  const headers = headerRow.map((h) => String(h || ''));
+
+  if (lastRow <= 1) {
+    return { headers, submissions: [], total: 0 };
+  }
+
+  const numRows = lastRow - 1;
+  const rawValues = sheet.getRange(2, 1, numRows, lastCol).getValues();
+
+  const submissions: Record<string, string | number>[] = [];
+  for (let r = 0; r < rawValues.length; r++) {
+    const row = rawValues[r];
+    if (!row) continue;
+    const item: Record<string, string | number> = {};
+    for (let c = 0; c < headers.length; c++) {
+      const colName = headers[c];
+      if (!colName) continue;
+      const cellVal = row[c];
+      if (cellVal === undefined || cellVal === null) {
+        item[colName] = '';
+      } else if (typeof cellVal === 'number') {
+        item[colName] = cellVal;
+      } else {
+        item[colName] = String(cellVal);
+      }
+    }
+    submissions.push(item);
+  }
+
+  // Newest submissions first
+  submissions.reverse();
+
+  return {
+    headers,
+    submissions,
+    total: submissions.length
+  };
+}
+
 

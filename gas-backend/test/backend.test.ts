@@ -146,4 +146,48 @@ describe('GAS Backend Architecture & Sheets Contract', () => {
     // Non-existent column
     expect(checkDuplicateValue(mockSheet, 'ایمیل', 'test@example.com')).toBe(false);
   });
+
+  it('fetches submissions from sheet and returns rows reversed (newest first)', async () => {
+    const mockSheet = {
+      getLastRow: () => 3, // header row + 2 data rows
+      getLastColumn: () => 3,
+      getRange: (row: number, _col: number, _numRows?: number, _numCols?: number) => {
+        if (row === 1) {
+          return {
+            getValues: () => [['کد رهگیری', 'نام', 'مبلغ']]
+          };
+        }
+        return {
+          getValues: () => [
+            ['FB-AA1122', 'علی محمدی', 50000],
+            ['FB-BB3344', 'سارا رضایی', 100000]
+          ]
+        };
+      }
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+
+    const mockSpreadsheet = {
+      getSheetByName: (name: string) => {
+        if (name === 'test-form') return mockSheet;
+        return null;
+      }
+    } as unknown as GoogleAppsScript.Spreadsheet.Spreadsheet;
+
+    const { getSubmissions } = await import('../src/sheets/repository');
+
+    const result = getSubmissions(mockSpreadsheet, 'test-form');
+    expect(result.total).toBe(2);
+    expect(result.headers).toEqual(['کد رهگیری', 'نام', 'مبلغ']);
+    // Newest first (row 2 before row 1)
+    expect(result.submissions[0]?.['کد رهگیری']).toBe('FB-BB3344');
+    expect(result.submissions[0]?.['نام']).toBe('سارا رضایی');
+    expect(result.submissions[0]?.['مبلغ']).toBe(100000);
+    expect(result.submissions[1]?.['کد رهگیری']).toBe('FB-AA1122');
+    expect(result.submissions[1]?.['نام']).toBe('علی محمدی');
+
+    // Non-existent form sheet
+    const emptyResult = getSubmissions(mockSpreadsheet, 'non-existent');
+    expect(emptyResult.total).toBe(0);
+    expect(emptyResult.submissions).toEqual([]);
+  });
 });

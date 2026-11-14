@@ -11,7 +11,8 @@ import {
   Layers,
   CheckCircle2,
   AlertCircle,
-  Share2
+  Share2,
+  Database
 } from 'lucide-react';
 import type { FormSummary } from '@fb/shared';
 import { toPersianDigits } from '@fb/shared';
@@ -202,6 +203,18 @@ export function AdminFormsPage() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                <Link to={`/admin/forms/${form.id}/submissions`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1 border-blue-500/20 hover:border-blue-500/40 text-blue-600 dark:text-blue-400 hover:text-blue-700"
+                    title="مشاهده پاسخ‌های ثبت‌شده و کدهای رهگیری"
+                  >
+                    <Database className="w-3.5 h-3.5" />
+                    <span>پاسخ‌ها</span>
+                  </Button>
+                </Link>
+
                 <Button
                   variant="outline"
                   size="sm"
