@@ -13,12 +13,14 @@ import {
   CheckCircle2,
   AlertCircle,
   HelpCircle,
-  Link2
+  Link2,
+  Share2
 } from 'lucide-react';
 import { formDefinitionSchema, toPersianDigits, normalizeDigits, type FormDefinition, type FieldDefinition, type FormSummary, type Preset, type Currency } from '@fb/shared';
 import { getForm, saveForm, listForms } from '@/lib/api/gas-client';
 import { getAdminToken } from '@/lib/auth/admin-auth';
 import { DynamicForm } from '@/components/form-engine/DynamicForm';
+import { ShareFormDialog } from '@/components/forms/ShareFormDialog';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +69,7 @@ export function FormBuilderPage() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
+  const [shareOpen, setShareOpen] = React.useState(false);
 
   // Load existing form if in edit mode
   React.useEffect(() => {
@@ -255,6 +258,19 @@ export function FormBuilderPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {form.id && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShareOpen(true)}
+              className="gap-1.5 text-xs text-primary border-primary/20 hover:border-primary/40 hover:text-primary"
+              title="کپی لینک و دریافت کد QR فرم"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>اشتراک و کد QR</span>
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="sm"
@@ -883,6 +899,15 @@ export function FormBuilderPage() {
           </div>
         )}
       </div>
+
+      {form.id && (
+        <ShareFormDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          formId={form.id}
+          formTitle={form.title}
+        />
+      )}
     </div>
   );
 }

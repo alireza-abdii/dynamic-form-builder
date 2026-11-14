@@ -87,5 +87,18 @@ describe('Frontend Form Engine Integration', () => {
     const invalid = schema.safeParse({ fee: '۱۰,۰۰۰' });
     expect(invalid.success).toBe(false);
   });
+
+  it('constructs correct public web and Telegram Mini App sharing deep links', () => {
+    const formId = 'leave-request';
+    const origin = 'https://forms.company.local';
+    const botUsername = 'form_builderr_bot';
+    const tmaShortname = 'forms';
+
+    const webUrl = `${origin}/f/${formId}`;
+    const tmaUrl = `https://t.me/${botUsername}/${tmaShortname}?startapp=${formId}`;
+
+    expect(webUrl).toBe('https://forms.company.local/f/leave-request');
+    expect(tmaUrl).toBe('https://t.me/form_builderr_bot/forms?startapp=leave-request');
+  });
 });
 

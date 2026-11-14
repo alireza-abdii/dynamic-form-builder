@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Layers,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Share2
 } from 'lucide-react';
 import type { FormSummary } from '@fb/shared';
 import { toPersianDigits } from '@fb/shared';
@@ -19,12 +20,14 @@ import { getAdminToken, clearAdminToken } from '@/lib/auth/admin-auth';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ShareFormDialog } from '@/components/forms/ShareFormDialog';
 
 export function AdminFormsPage() {
   const navigate = useNavigate();
   const [forms, setForms] = React.useState<FormSummary[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [sharingForm, setSharingForm] = React.useState<{ id: string; title: string } | null>(null);
   const [feedback, setFeedback] = React.useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchForms = React.useCallback(async () => {
@@ -199,6 +202,17 @@ export function AdminFormsPage() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSharingForm({ id: form.id, title: form.title })}
+                  className="h-8 text-xs gap-1 border-primary/20 hover:border-primary/40 text-primary hover:text-primary"
+                  title="کپی لینک و تولید کد QR"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>اشتراک‌گذاری</span>
+                </Button>
+
                 <Link to={`/f/${form.id}`} target="_blank" rel="noreferrer">
                   <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -235,6 +249,15 @@ export function AdminFormsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {sharingForm && (
+        <ShareFormDialog
+          open={Boolean(sharingForm)}
+          onOpenChange={(open) => !open && setSharingForm(null)}
+          formId={sharingForm.id}
+          formTitle={sharingForm.title}
+        />
       )}
     </div>
   );
