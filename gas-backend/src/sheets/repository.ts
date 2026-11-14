@@ -2,6 +2,7 @@
  * Google Sheets Data Access Layer.
  */
 import type { FormDefinition, SubmitRequest } from '@fb/shared';
+import { normalizeDigits } from '@fb/shared';
 
 export interface BaseSubmissionMeta {
   submissionId: string;
@@ -215,4 +216,40 @@ export function getTabStats(
     lastSubmissionDate
   };
 }
+
+/**
+ * Checks whether a given value already exists in the column for a specific field label.
+ * Performs normalization (digit normalization, trimming, case-insensitivity) to ensure
+ * reliable comparisons across keyboards.
+ */
+export function checkDuplicateValue(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  fieldLabel: string,
+  value: string | number
+): boolean {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return false;
+
+  const lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return false;
+
+  const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+  const colIndex = headerRow.findIndex((h) => h === fieldLabel);
+  if (colIndex === -1) return false;
+
+  const sheetColNum = colIndex + 1;
+  const numRows = lastRow - 1;
+
+  const colData = sheet.getRange(2, sheetColNum, numRows, 1).getValues() as (string | number)[][];
+  const targetClean = normalizeDigits(String(value)).trim().toLowerCase();
+  if (!targetClean) return false;
+
+  return colData.some((row) => {
+    const cellVal = row[0];
+    if (cellVal === undefined || cellVal === null || cellVal === '') return false;
+    const cleanCell = normalizeDigits(String(cellVal)).trim().toLowerCase();
+    return cleanCell === targetClean;
+  });
+}
+
 

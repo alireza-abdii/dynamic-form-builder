@@ -14,7 +14,7 @@ import { getScriptConfig } from '../config';
 import { withScriptLock } from '../utils/lock';
 import { isDuplicateSubmission, markSubmissionProcessed } from '../utils/dedupe';
 import { verifyTelegramInitData, type VerifiedTelegramUser } from './telegram-auth';
-import { openSpreadsheet, getOrCreateTab, appendSubmissionRow } from '../sheets/repository';
+import { openSpreadsheet, getOrCreateTab, appendSubmissionRow, checkDuplicateValue } from '../sheets/repository';
 import { sendTelegramMessage, escapeHtml } from '../telegram/api';
 import { buildNotificationKeyboard } from '../telegram/keyboards';
 import { resolveForm } from './form-resolver';
@@ -154,12 +154,34 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
     };
   }
 
-  // 8. Thread-safe write to Google Sheets
+  // 8. Thread-safe write to Google Sheets with Unique field validation
   const isoDateStr = new Date().toISOString();
 
-  withScriptLock(() => {
+  const writeResult = withScriptLock<ApiResponse | null>(() => {
     const ss = openSpreadsheet(cfg.spreadsheetId);
     const sheet = getOrCreateTab(ss, form);
+
+    // 8.1. Unique field check against existing rows in sheet
+    for (const field of form.fields) {
+      if (field.unique) {
+        const val = req.values[field.key];
+        if (val !== undefined && val !== null && val !== '') {
+          const isDup = checkDuplicateValue(sheet, field.label, val as string | number);
+          if (isDup) {
+            const displayVal = String(val);
+            const errorMsg = fa.duplicateField(field.label, displayVal);
+            return {
+              ok: false,
+              code: 'VALIDATION',
+              message: errorMsg,
+              fieldErrors: {
+                [field.key]: errorMsg
+              }
+            };
+          }
+        }
+      }
+    }
 
     appendSubmissionRow(sheet, form, req, {
       submissionId: req.submissionId,
@@ -171,7 +193,12 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
     });
 
     markSubmissionProcessed(req.submissionId);
+    return null;
   }, 20000);
+
+  if (writeResult && !writeResult.ok) {
+    return writeResult;
+  }
 
   // 9. Dispatch Admin Notifications (non-blocking, errors ignored)
   if (form.notifyAdmins && cfg.adminChatIds.length > 0 && cfg.botToken) {

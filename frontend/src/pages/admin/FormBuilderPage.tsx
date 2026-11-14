@@ -514,6 +514,11 @@ export function FormBuilderPage() {
                         {field.required && (
                           <Badge variant="destructive" className="text-[10px]">الزامی</Badge>
                         )}
+                        {field.unique && (
+                          <Badge variant="outline" className="text-[10px] text-purple-700 dark:text-purple-300 border-purple-300 bg-purple-50 dark:bg-purple-950/40">
+                            یکتا
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1">
@@ -567,17 +572,37 @@ export function FormBuilderPage() {
                         />
                       </div>
 
-                      <div className="flex items-center gap-2 pt-6">
-                        <input
-                          type="checkbox"
-                          id={`req_${idx}`}
-                          checked={field.required || false}
-                          onChange={(e) => updateField(idx, { ...field, required: e.target.checked })}
-                          className="rounded border-input text-primary focus:ring-primary w-4 h-4 cursor-pointer"
-                        />
-                        <Label htmlFor={`req_${idx}`} className="text-xs font-medium cursor-pointer">
-                          تکمیل این فیلد الزامی است
-                        </Label>
+                      <div className="flex flex-wrap items-center gap-4 pt-6">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`req_${idx}`}
+                            checked={field.required || false}
+                            onChange={(e) => updateField(idx, { ...field, required: e.target.checked })}
+                            className="rounded border-input text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                          />
+                          <Label htmlFor={`req_${idx}`} className="text-xs font-medium cursor-pointer">
+                            الزامی
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`uniq_${idx}`}
+                            checked={field.unique || false}
+                            onChange={(e) => updateField(idx, { ...field, unique: e.target.checked })}
+                            className="rounded border-input text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                          />
+                          <Label
+                            htmlFor={`uniq_${idx}`}
+                            className="text-xs font-medium cursor-pointer flex items-center gap-1 text-foreground"
+                            title="جلوگیری از ثبت تکراری با این مقدار (مانند کد ملی، شماره موبایل، ایمیل و غیره)"
+                          >
+                            <span>مقدار یکتا</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">(بدون تکرار)</span>
+                          </Label>
+                        </div>
                       </div>
                     </div>
 

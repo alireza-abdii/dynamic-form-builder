@@ -264,4 +264,44 @@ describe('Dynamic Zod Schema Builder', () => {
     });
     expect(parsedBelowMin.success).toBe(false);
   });
+
+  it('validates and accepts unique field declarations in form definition schema', async () => {
+    const { formDefinitionSchema } = await import('../src/definition.schema');
+    const { fa } = await import('../src/messages.fa');
+
+    const formWithUnique = {
+      id: 'course-signup',
+      version: 1,
+      title: 'ثبت‌نام دوره تخصصی',
+      status: 'open',
+      access: 'public',
+      notifyAdmins: true,
+      submitLabel: 'ثبت‌نام',
+      successMessage: 'ثبت‌نام با موفقیت انجام شد',
+      fields: [
+        {
+          key: 'nationalId',
+          type: 'text',
+          label: 'کد ملی',
+          preset: 'national-id',
+          required: true,
+          unique: true
+        },
+        {
+          key: 'mobile',
+          type: 'tel',
+          label: 'شماره همراه',
+          required: true,
+          unique: true
+        }
+      ]
+    };
+
+    const parsed = formDefinitionSchema.safeParse(formWithUnique);
+    expect(parsed.success).toBe(true);
+
+    // Verify duplicate error message formatting
+    expect(fa.duplicateField('کد ملی', '0010359745')).toContain('0010359745');
+    expect(fa.duplicateField('کد ملی', '0010359745')).toContain('امکان ثبت مجدد وجود ندارد');
+  });
 });

@@ -23,6 +23,7 @@ const baseFieldSchema = z.object({
   }),
   label: z.string().min(1, 'Label cannot be empty.'),
   required: z.boolean().optional(),
+  unique: z.boolean().optional(),
   hint: z.string().optional(),
   placeholder: z.string().optional()
 });

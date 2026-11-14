@@ -107,4 +107,43 @@ describe('GAS Backend Architecture & Sheets Contract', () => {
     expect(currencyForm.fields[0]?.type).toBe('number');
     expect(currencyForm.fields[0]?.currency).toBe('toman');
   });
+
+  it('detects duplicate values across sheets with Persian and ASCII numeral normalization', async () => {
+    const mockSheet = {
+      getLastRow: () => 3,
+      getLastColumn: () => 2,
+      getRange: (row: number, col: number) => {
+        if (row === 1) {
+          return {
+            getValues: () => [['کد ملی', 'شماره همراه']]
+          };
+        }
+        if (col === 1) {
+          return {
+            getValues: () => [['0010359745'], ['0020468856']]
+          };
+        }
+        return {
+          getValues: () => [['09121112233'], ['09354445566']]
+        };
+      }
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+
+    const { checkDuplicateValue } = await import('../src/sheets/repository');
+
+    // Duplicate exact match
+    expect(checkDuplicateValue(mockSheet, 'کد ملی', '0010359745')).toBe(true);
+
+    // Duplicate with Persian digits
+    expect(checkDuplicateValue(mockSheet, 'کد ملی', '۰۰۱۰۳۵۹۷۴۵')).toBe(true);
+
+    // Duplicate mobile with leading space
+    expect(checkDuplicateValue(mockSheet, 'شماره همراه', ' 09121112233 ')).toBe(true);
+
+    // New non-duplicate value
+    expect(checkDuplicateValue(mockSheet, 'کد ملی', '0030579967')).toBe(false);
+
+    // Non-existent column
+    expect(checkDuplicateValue(mockSheet, 'ایمیل', 'test@example.com')).toBe(false);
+  });
 });
