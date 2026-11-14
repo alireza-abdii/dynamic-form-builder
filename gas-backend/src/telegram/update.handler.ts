@@ -22,6 +22,7 @@ import {
 import { openSpreadsheet, getTabStats, updateSubmissionStatus, type TabStats } from '../sheets/repository';
 import { exportTabToXlsxBlob } from '../export/xlsx-exporter';
 import { resolveForm, listAllForms } from '../forms/form-resolver';
+import { handleTrackSubmission } from '../forms/track.handler';
 
 export interface TelegramUpdate {
   update_id: number;
@@ -450,6 +451,79 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     ) {
       const reply = renderHelpText(isAdmin);
       sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: mainMenuMarkup });
+      return;
+    }
+
+    // 2.2.1. Command: /track [code] or "پیگیری"
+    if (
+      command === '/track' ||
+      rawText === 'پیگیری' ||
+      rawText === 'پیگیری درخواست' ||
+      rawText.startsWith('پیگیری ')
+    ) {
+      let codeToTrack = argStr;
+      if (!codeToTrack && rawText.startsWith('پیگیری ')) {
+        codeToTrack = rawText.replace('پیگیری ', '').trim();
+      }
+
+      if (!codeToTrack) {
+        sendTelegramMessage(
+          cfg.botToken,
+          chatId,
+          '🔍 <b>پیگیری وضعیت درخواست</b>\n\nلطفاً کد رهگیری خود را ارسال کنید:\n<code>/track FB-XXXXXX</code>',
+          { replyMarkup: mainMenuMarkup }
+        );
+        return;
+      }
+
+      try {
+        const ss = openSpreadsheet(cfg.spreadsheetId);
+        const res = handleTrackSubmission(ss, codeToTrack);
+
+        if (!res.ok) {
+          sendTelegramMessage(cfg.botToken, chatId, `⚠️ ${res.message}`, { replyMarkup: mainMenuMarkup });
+          return;
+        }
+
+        if (!res.found) {
+          sendTelegramMessage(
+            cfg.botToken,
+            chatId,
+            `⚠️ درخواستی با کد رهگیری <code>${escapeHtml(codeToTrack)}</code> در سامانه یافت نشد.\nلطفاً از صحت کد واردشده اطمینان حاصل فرمایید.`,
+            { replyMarkup: mainMenuMarkup }
+          );
+          return;
+        }
+
+        const isApproved = res.status === 'تایید شد';
+        const isRejected = res.status === 'رد شد';
+        const isPending = res.status === 'در انتظار بررسی';
+        const statusIcon = isApproved ? '✅' : isRejected ? '❌' : isPending ? '⏳' : '🟢';
+
+        let reply = `🔍 <b>نتیجه استعلام وضعیت درخواست</b>\n` +
+          `━━━━━━━━━━━━━━━━━━\n` +
+          `📋 <b>فرم:</b> «${escapeHtml(res.formTitle || '')}»\n` +
+          `🔖 <b>کد رهگیری:</b> <code>${res.trackingCode}</code>\n` +
+          (res.jalaliDate ? `📅 <b>تاریخ ثبت:</b> ${toPersianDigits(res.jalaliDate)}\n` : '') +
+          `📌 <b>وضعیت کنونی:</b> ${statusIcon} <b>${res.status}</b>\n` +
+          (res.reviewedBy ? `👤 <b>بررسی توسط:</b> ${escapeHtml(res.reviewedBy)}\n` : '') +
+          `──────────────────\n`;
+
+        if (isApproved) {
+          reply += `<i>درخواست شما با موفقیت تایید شده است.</i>`;
+        } else if (isRejected) {
+          reply += `<i>درخواست شما پس از بررسی، مورد موافقت قرار نگرفت.</i>`;
+        } else if (isPending) {
+          reply += `<i>درخواست شما در نوبت بررسی توسط مدیریت قرار دارد.</i>`;
+        } else {
+          reply += `<i>اطلاعات شما با موفقیت در سامانه ثبت و بایگانی شده است.</i>`;
+        }
+
+        sendTelegramMessage(cfg.botToken, chatId, reply, { replyMarkup: mainMenuMarkup });
+      } catch (err: unknown) {
+        console.error('[telegram] Track error:', err);
+        sendTelegramMessage(cfg.botToken, chatId, 'خطا در استعلام وضعیت از سرور.', { replyMarkup: mainMenuMarkup });
+      }
       return;
     }
 

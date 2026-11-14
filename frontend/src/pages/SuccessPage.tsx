@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
-import { CheckCircle2, ArrowRight, Copy, Check, RotateCcw, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Copy, Check, RotateCcw, ShieldCheck, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTelegram } from '@/lib/telegram/useTelegram';
@@ -138,6 +138,15 @@ export function SuccessPage() {
         )}
 
         <CardContent className="p-0 pt-2 flex flex-col gap-2.5">
+          {trackingCode && (
+            <Link to={`/track?code=${trackingCode}`} className="w-full">
+              <Button size="default" className="w-full gap-2 text-xs font-semibold">
+                <Search className="h-3.5 w-3.5" />
+                <span>پیگیری وضعیت این درخواست</span>
+              </Button>
+            </Link>
+          )}
+
           {isTma ? (
             <Button size="lg" className="w-full font-bold" onClick={handleClose}>
               بستن پنجره

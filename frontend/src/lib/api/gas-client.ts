@@ -3,6 +3,7 @@ import {
   type ApiResponse,
   type FormDefinition,
   type FormSummary,
+  type TrackResponse,
   apiResponseSchema,
   fa,
   generateTrackingCode
@@ -165,6 +166,22 @@ export async function getSubmissions(
       headers: [],
       submissions: [],
       total: 0,
+      message: err instanceof Error ? err.message : 'خطای ارتباط با سرور'
+    };
+  }
+}
+
+export async function trackSubmission(trackingCode: string): Promise<TrackResponse> {
+  try {
+    const res = await postToGas<TrackResponse>({
+      action: 'track',
+      trackingCode
+    });
+    return res;
+  } catch (err) {
+    return {
+      ok: false,
+      found: false,
       message: err instanceof Error ? err.message : 'خطای ارتباط با سرور'
     };
   }

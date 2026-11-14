@@ -12,6 +12,7 @@ import { getFieldOptions } from './forms/options.handler';
 import { saveDynamicForm, deleteDynamicForm } from './forms/dynamic-forms';
 import { verifyAdminCredentials, createSessionToken, verifySessionToken } from './auth/session';
 import { openSpreadsheet, getSubmissions } from './sheets/repository';
+import { handleTrackSubmission } from './forms/track.handler';
 import type { SubmitRequest, FormDefinition } from '@fb/shared';
 
 export function handleDoGet(
@@ -58,6 +59,17 @@ export function handleDoGet(
     }
     const options = getFieldOptions(formId, fieldKey);
     return jsonOut({ ok: true, options });
+  }
+
+  if (action === 'track') {
+    const code = e?.parameter?.code || e?.parameter?.trackingCode;
+    if (!code) {
+      return jsonOut({ ok: false, found: false, message: 'کد رهگیری الزامی است.' });
+    }
+    const cfg = getScriptConfig();
+    const ss = openSpreadsheet(cfg.spreadsheetId);
+    const result = handleTrackSubmission(ss, code);
+    return jsonOut(result);
   }
 
   return jsonOut({
@@ -231,7 +243,23 @@ export function handleDoPost(
     }
   }
 
-  // 10. Client Dynamic Form Submission
+  // 10. Public Status Tracking (action === 'track')
+  if (body && typeof body === 'object' && (body as Record<string, unknown>).action === 'track') {
+    const payload = body as { trackingCode?: string };
+    if (!payload.trackingCode) {
+      return jsonOut({ ok: false, found: false, message: 'کد رهگیری الزامی است.' });
+    }
+    try {
+      const ss = openSpreadsheet(cfg.spreadsheetId);
+      const result = handleTrackSubmission(ss, payload.trackingCode);
+      return jsonOut(result);
+    } catch (err: unknown) {
+      console.error('[router] Error tracking submission:', err);
+      return jsonOut({ ok: false, found: false, message: err instanceof Error ? err.message : 'خطای سرور' });
+    }
+  }
+
+  // 11. Client Dynamic Form Submission
   if (body && typeof body === 'object' && (body as Record<string, unknown>).action === 'submit') {
     try {
       const result = handleFormSubmission(body as SubmitRequest);

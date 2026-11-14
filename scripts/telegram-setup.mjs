@@ -86,6 +86,10 @@ async function run() {
                 description: 'لیست فرم‌های سازمانی فعال'
             },
             {
+                command: 'track',
+                description: 'پیگیری وضعیت درخواست با کد رهگیری'
+            },
+            {
                 command: 'export',
                 description: 'دریافت خروجی اکسل (xlsx.)'
             },

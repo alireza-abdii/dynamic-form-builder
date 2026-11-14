@@ -279,4 +279,67 @@ describe('GAS Backend Architecture & Sheets Contract', () => {
     expect(duplicateClick.previousStatus).toBe('تایید شد');
     expect(duplicateClick.reviewer).toBe('علیرضا – ۱۴۰۵/۰۸/۱۹');
   });
+
+  it('tracks submission status securely without leaking personal info', async () => {
+    const mockFoundSheet = {
+      getName: () => 'employee-contact-info',
+      getLastColumn: () => 4,
+      getRange: (row: number, _col: number, _numRows?: number, _numCols?: number) => {
+        if (row === 1) {
+          return {
+            getValues: () => [['کد رهگیری', 'وضعیت', 'بررسی توسط', 'تاریخ ثبت (شمسی)']]
+          };
+        }
+        return {
+          getValues: () => [['FB-7K3M9Q', 'تایید شد', 'علیرضا', '1405/08/19']]
+        };
+      }
+    };
+
+    const mockSpreadsheet = {
+      createTextFinder: (code: string) => {
+        return {
+          matchEntireCell: () => {
+            return {
+              findAll: () => {
+                if (code === 'FB-7K3M9Q') {
+                  return [
+                    {
+                      getSheet: () => mockFoundSheet,
+                      getRow: () => 2
+                    }
+                  ];
+                }
+                return [];
+              }
+            };
+          }
+        };
+      }
+    } as unknown as GoogleAppsScript.Spreadsheet.Spreadsheet;
+
+    const { handleTrackSubmission } = await import('../src/forms/track.handler');
+
+    // 1. Valid tracking code found
+    const foundRes = handleTrackSubmission(mockSpreadsheet, 'fb-7k3m9q');
+    expect(foundRes.ok).toBe(true);
+    expect(foundRes.found).toBe(true);
+    expect(foundRes.trackingCode).toBe('FB-7K3M9Q');
+    expect(foundRes.status).toBe('تایید شد');
+    expect(foundRes.reviewedBy).toBe('علیرضا');
+    expect(foundRes.jalaliDate).toBe('1405/08/19');
+    // Ensure no personal data properties exist on returned object
+    expect((foundRes as unknown as Record<string, unknown>)['mobile']).toBeUndefined();
+    expect((foundRes as unknown as Record<string, unknown>)['nationalId']).toBeUndefined();
+    expect((foundRes as unknown as Record<string, unknown>)['fullName']).toBeUndefined();
+
+    // 2. Non-existent code
+    const notFoundRes = handleTrackSubmission(mockSpreadsheet, 'FB-999999');
+    expect(notFoundRes.ok).toBe(true);
+    expect(notFoundRes.found).toBe(false);
+
+    // 3. Invalid code format
+    const invalidRes = handleTrackSubmission(mockSpreadsheet, 'invalid!');
+    expect(invalidRes.ok).toBe(false);
+  });
 });

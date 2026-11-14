@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { HomePage } from '@/pages/HomePage';
 import { FormPage } from '@/pages/FormPage';
 import { SuccessPage } from '@/pages/SuccessPage';
+import { TrackPage } from '@/pages/TrackPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { AdminLoginPage } from '@/pages/admin/AdminLoginPage';
 import { AdminFormsPage } from '@/pages/admin/AdminFormsPage';
@@ -31,6 +32,7 @@ export function AppRouter() {
       <TelegramRouterWatcher />
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/track" element={<TrackPage />} />
         <Route path="/f/:formId" element={<FormPage />} />
         <Route path="/f/:formId/done" element={<SuccessPage />} />
 

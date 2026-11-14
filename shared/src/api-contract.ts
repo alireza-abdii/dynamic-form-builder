@@ -161,4 +161,23 @@ export const getSubmissionsResponseSchema = z.object({
 });
 export type GetSubmissionsResponse = z.infer<typeof getSubmissionsResponseSchema>;
 
+export const trackRequestSchema = z.object({
+  action: z.literal('track'),
+  trackingCode: z.string().min(1)
+});
+export type TrackRequest = z.infer<typeof trackRequestSchema>;
+
+export const trackResponseSchema = z.object({
+  ok: z.boolean(),
+  found: z.boolean(),
+  trackingCode: z.string().optional(),
+  formTitle: z.string().optional(),
+  jalaliDate: z.string().optional(),
+  status: z.string().optional(),
+  reviewedBy: z.string().optional(),
+  message: z.string().optional()
+});
+export type TrackResponse = z.infer<typeof trackResponseSchema>;
+
+
 
