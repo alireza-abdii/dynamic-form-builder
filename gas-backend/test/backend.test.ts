@@ -190,4 +190,93 @@ describe('GAS Backend Architecture & Sheets Contract', () => {
     expect(emptyResult.total).toBe(0);
     expect(emptyResult.submissions).toEqual([]);
   });
+
+  it('builds notification keyboard with inline approval buttons when requiresApproval is enabled', async () => {
+    const { buildNotificationKeyboard } = await import('../src/telegram/keyboards');
+
+    // With approval workflow enabled
+    const approvalKeyboard = buildNotificationKeyboard('leave-req', {
+      trackingCode: 'FB-7K3M9Q',
+      requiresApproval: true,
+      publicBaseUrl: 'https://example.com'
+    });
+
+    expect(approvalKeyboard.inline_keyboard.length).toBe(2);
+    expect(approvalKeyboard.inline_keyboard[0]?.[0]?.text).toContain('تایید');
+    expect(approvalKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe('ap:leave-req:FB-7K3M9Q');
+    expect(approvalKeyboard.inline_keyboard[0]?.[1]?.text).toContain('رد');
+    expect(approvalKeyboard.inline_keyboard[0]?.[1]?.callback_data).toBe('rj:leave-req:FB-7K3M9Q');
+
+    // Without approval workflow
+    const normalKeyboard = buildNotificationKeyboard('contact-us', {
+      trackingCode: 'FB-AA1122',
+      requiresApproval: false
+    });
+    expect(normalKeyboard.inline_keyboard.length).toBe(1);
+    expect(normalKeyboard.inline_keyboard[0]?.[0]?.callback_data).toBe('x:contact-us');
+  });
+
+  it('updates submission status, reviewer, and background color, and rejects already processed submissions', async () => {
+    let statusVal = '';
+    let reviewerVal = '';
+    let bgVal = '';
+
+    const mockSheet = {
+      getLastRow: () => 2,
+      getLastColumn: () => 4,
+      getRange: (row: number, col: number, numRows?: number, numCols?: number) => {
+        if (row === 1 && (numRows === 1 || !numRows)) {
+          return {
+            getValues: () => [['کد رهگیری', 'وضعیت', 'بررسی توسط', 'شناسه تلگرام']]
+          };
+        }
+        if (numCols && numCols > 1) {
+          return {
+            setBackground: (color: string) => {
+              bgVal = color;
+            }
+          };
+        }
+        if (numRows && numRows > 0) {
+          // Column 1 (کد رهگیری) data
+          return {
+            getValues: () => [['FB-7K3M9Q']]
+          };
+        }
+        // Specific cell get/set
+        return {
+          getValue: () => {
+            if (col === 2) return statusVal;
+            if (col === 3) return reviewerVal;
+            if (col === 4) return '247249834';
+            return '';
+          },
+          setValue: (val: string) => {
+            if (col === 2) statusVal = val;
+            if (col === 3) reviewerVal = val;
+          },
+          setBackground: (color: string) => {
+            bgVal = color;
+          }
+        };
+      }
+    } as unknown as GoogleAppsScript.Spreadsheet.Sheet;
+
+    const { updateSubmissionStatus } = await import('../src/sheets/repository');
+
+    // 1. Initial approval
+    const result = updateSubmissionStatus(mockSheet, 'FB-7K3M9Q', 'تایید شد', 'علیرضا – ۱۴۰۵/۰۸/۱۹');
+    expect(result.ok).toBe(true);
+    expect(result.tgUserId).toBe('247249834');
+    expect(statusVal).toBe('تایید شد');
+    expect(reviewerVal).toBe('علیرضا – ۱۴۰۵/۰۸/۱۹');
+    expect(bgVal).toBe('#dcfce7'); // light green
+
+    // 2. Second click attempt (race condition protection)
+    const duplicateClick = updateSubmissionStatus(mockSheet, 'FB-7K3M9Q', 'رد شد', 'مدیر دوم');
+    expect(duplicateClick.ok).toBe(false);
+    expect(duplicateClick.alreadyProcessed).toBe(true);
+    expect(duplicateClick.previousStatus).toBe('تایید شد');
+    expect(duplicateClick.reviewer).toBe('علیرضا – ۱۴۰۵/۰۸/۱۹');
+  });
 });

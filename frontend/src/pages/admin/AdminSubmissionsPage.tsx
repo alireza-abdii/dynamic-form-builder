@@ -426,7 +426,53 @@ export function AdminSubmissionsPage() {
                         );
                       }
 
-                      // 4. Default Data Cell
+                      // 4. Status Column (Approval Workflow)
+                      if (h === 'وضعیت') {
+                        if (isEmpty) {
+                          return (
+                            <td key={colIdx} className="py-2.5 px-3.5 border-e border-border/40 last:border-e-0 text-muted-foreground">
+                              —
+                            </td>
+                          );
+                        }
+                        const statusStr = String(val);
+                        const isApproved = statusStr === 'تایید شد';
+                        const isRejected = statusStr === 'رد شد';
+                        const isPending = statusStr === 'در انتظار بررسی';
+
+                        return (
+                          <td key={colIdx} className="py-2.5 px-3.5 whitespace-nowrap border-e border-border/40 last:border-e-0">
+                            <Badge
+                              variant="outline"
+                              className={`text-[11px] font-semibold px-2 py-0.5 ${
+                                isApproved
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
+                                  : isRejected
+                                  ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30'
+                                  : isPending
+                                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {statusStr}
+                            </Badge>
+                          </td>
+                        );
+                      }
+
+                      // 5. Reviewed By Column
+                      if (h === 'بررسی توسط') {
+                        return (
+                          <td
+                            key={colIdx}
+                            className="py-2.5 px-3.5 whitespace-nowrap text-muted-foreground text-[11px] border-e border-border/40 last:border-e-0"
+                          >
+                            {isEmpty ? '—' : toPersianDigits(String(val))}
+                          </td>
+                        );
+                      }
+
+                      // 6. Default Data Cell
                       return (
                         <td
                           key={colIdx}

@@ -19,7 +19,7 @@ import {
   buildExportSelectionKeyboard,
   buildStatsSelectionKeyboard
 } from './keyboards';
-import { openSpreadsheet, getTabStats, type TabStats } from '../sheets/repository';
+import { openSpreadsheet, getTabStats, updateSubmissionStatus, type TabStats } from '../sheets/repository';
 import { exportTabToXlsxBlob } from '../export/xlsx-exporter';
 import { resolveForm, listAllForms } from '../forms/form-resolver';
 
@@ -158,6 +158,105 @@ export function handleTelegramUpdate(update: TelegramUpdate): void {
     const messageId = cq.message?.message_id;
     const data = cq.data || '';
     const isAdmin = isTelegramAdmin(cq.from.id);
+
+    // 1.0. Approve or Reject Submission Callback (ap:formId:trackingCode or rj:formId:trackingCode)
+    if (data.startsWith('ap:') || data.startsWith('rj:')) {
+      if (!isAdmin) {
+        answerTelegramCallbackQuery(cfg.botToken, cq.id, '⛔ شما دسترسی مجاز برای تعیین وضعیت این درخواست را ندارید.', true);
+        return;
+      }
+
+      const parts = data.split(':');
+      const actionType = parts[0];
+      const formId = parts[1];
+      const trackingCode = parts[2];
+
+      if (!formId || !trackingCode) {
+        answerTelegramCallbackQuery(cfg.botToken, cq.id, 'پارامترهای درخواست نامعتبر است.', true);
+        return;
+      }
+
+      const actionLabel = actionType === 'ap' ? 'تایید شد' : 'رد شد';
+
+      try {
+        const ss = openSpreadsheet(cfg.spreadsheetId);
+        const sheet = ss.getSheetByName(formId);
+        if (!sheet) {
+          answerTelegramCallbackQuery(cfg.botToken, cq.id, 'شیت فرم در جدول سازمانی یافت نشد.', true);
+          return;
+        }
+
+        const today = getTodayJalali();
+        const dateStr = formatJalaliString(today.jy, today.jm, today.jd);
+        const reviewerDisplay = `${cq.from.first_name}${cq.from.username ? ` (@${cq.from.username})` : ''} – ${toPersianDigits(dateStr)}`;
+
+        const result = updateSubmissionStatus(sheet, trackingCode, actionLabel, reviewerDisplay);
+
+        if (result.alreadyProcessed) {
+          answerTelegramCallbackQuery(
+            cfg.botToken,
+            cq.id,
+            `⚠️ این درخواست قبلاً توسط «${result.reviewer || 'مدیریت'}» تعیین تکلیف شده است (${result.previousStatus}).`,
+            true
+          );
+          return;
+        }
+
+        if (!result.ok) {
+          answerTelegramCallbackQuery(cfg.botToken, cq.id, result.message || 'خطا در ثبت وضعیت درخواست.', true);
+          return;
+        }
+
+        // 1. Acknowledge callback popup
+        answerTelegramCallbackQuery(
+          cfg.botToken,
+          cq.id,
+          `درخواست ${trackingCode} با موفقیت «${actionLabel}».`,
+          false
+        );
+
+        // 2. Edit original admin alert message to show status badge and remove action buttons
+        if (messageId) {
+          const statusIcon = actionLabel === 'تایید شد' ? '✅' : '❌';
+          const updateNote = `\n\n━━━━━━━━━━━━━━━━━━\n` +
+            `📌 <b>وضعیت نهایی:</b> ${statusIcon} <b>${actionLabel}</b>\n` +
+            `👤 <b>بررسی توسط:</b> ${escapeHtml(reviewerDisplay)}`;
+
+          const origText = cq.message && 'text' in cq.message ? String((cq.message as { text: string }).text) : '';
+          const newText = (origText || `درخواست فرم با کد رهگیری ${trackingCode}`) + updateNote;
+
+          const updatedKeyboard = {
+            inline_keyboard: [
+              [{ text: '📥 دانلود فایل اکسل فرم', callback_data: `x:${formId}` }]
+            ]
+          };
+
+          editTelegramMessageText(cfg.botToken, chatId, messageId, newText, { replyMarkup: updatedKeyboard });
+        }
+
+        // 3. Notify submitter if submitted via Telegram
+        if (result.tgUserId) {
+          const resolved = resolveForm(formId);
+          const formTitle = resolved?.form.title || formId;
+          const statusIcon = actionLabel === 'تایید شد' ? '✅' : '❌';
+          const userMsg = `🔔 <b>نتیجه بررسی درخواست شما</b>\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `📋 <b>فرم:</b> «${escapeHtml(formTitle)}»\n` +
+            `🏷 <b>کد رهگیری:</b> <code>${escapeHtml(trackingCode)}</code>\n` +
+            `📌 <b>وضعیت:</b> ${statusIcon} <b>${actionLabel}</b>\n` +
+            `📅 <b>تاریخ بررسی:</b> ${toPersianDigits(dateStr)}\n\n` +
+            (actionLabel === 'تایید شد'
+              ? `<i>درخواست شما مورد تایید مدیریت قرار گرفت و مراحل لازم پیگیری خواهد شد.</i>`
+              : `<i>درخواست شما پس از بررسی توسط مدیریت، مورد تایید قرار نگرفت.</i>`);
+
+          sendTelegramMessage(cfg.botToken, result.tgUserId, userMsg);
+        }
+      } catch (err: unknown) {
+        console.error('[telegram] Approve/Reject error:', err);
+        answerTelegramCallbackQuery(cfg.botToken, cq.id, 'خطا در ثبت وضعیت در سرور.', true);
+      }
+      return;
+    }
 
     // 1.1. Export tab to Excel (.xlsx)
     if (data.startsWith('x:')) {

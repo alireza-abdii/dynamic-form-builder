@@ -44,6 +44,7 @@ const DEFAULT_FORM: FormDefinition = {
   status: 'open',
   access: 'public',
   notifyAdmins: true,
+  requiresApproval: false,
   submitLabel: 'ثبت اطلاعات',
   successMessage: 'اطلاعات شما با موفقیت ثبت شد. سپاس 🌱',
   fields: [
@@ -457,6 +458,27 @@ export function FormBuilderPage() {
                     onChange={(e) => updateFormMeta('successMessage', e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3.5 bg-muted/30 rounded-xl border border-border/70">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                    <Label htmlFor="req-approval" className="text-sm font-semibold cursor-pointer">
+                      فرآیند تایید و رد درخواست توسط مدیریت (Approval Workflow)
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    در صورت فعال‌بودن، دکمه‌های تایید و رد در تلگرام مدیران نمایش داده شده و وضعیت بررسی در شیت ثبت می‌شود.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="req-approval"
+                  checked={Boolean(form.requiresApproval)}
+                  onChange={(e) => updateFormMeta('requiresApproval', e.target.checked)}
+                  className="rounded border-input text-primary w-5 h-5 cursor-pointer shrink-0"
+                />
               </div>
             </Card>
           ) : (

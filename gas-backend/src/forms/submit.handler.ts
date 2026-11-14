@@ -234,7 +234,11 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
         (verifiedUser ? `👤 <b>کاربر تلگرام:</b> ${escapeHtml(verifiedUser.first_name)} (@${verifiedUser.username || '-'})\n` : '') +
         (previewText ? `──────────────────\n📝 <b>خلاصه اطلاعات ورودی:</b>\n${previewText}` : '');
 
-      const keyboard = buildNotificationKeyboard(form.id, cfg.publicBaseUrl);
+      const keyboard = buildNotificationKeyboard(form.id, {
+        publicBaseUrl: cfg.publicBaseUrl,
+        trackingCode,
+        requiresApproval: form.requiresApproval
+      });
 
       for (const adminId of cfg.adminChatIds) {
         sendTelegramMessage(cfg.botToken, adminId, alertMessage, { replyMarkup: keyboard });

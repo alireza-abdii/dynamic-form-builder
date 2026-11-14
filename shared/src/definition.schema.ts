@@ -120,6 +120,7 @@ export const formDefinitionSchema = z.object({
   closesAt: z.string().nullable().optional(),
   access: z.enum(['public', 'telegram']).default('public'),
   notifyAdmins: z.boolean().default(true),
+  requiresApproval: z.boolean().default(false).optional(),
   submitLabel: z.string().default('ثبت اطلاعات'),
   successMessage: z.string().default('اطلاعات شما با موفقیت ثبت شد. سپاس 🌱'),
   fields: z.array(fieldDefinitionSchema).min(1, 'فرم باید حداقل دارای یک فیلد باشد.')

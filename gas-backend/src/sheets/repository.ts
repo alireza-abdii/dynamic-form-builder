@@ -16,6 +16,8 @@ export interface BaseSubmissionMeta {
 
 export const TECHNICAL_COLUMNS = [
   { key: '__trackingCode', label: 'کد رهگیری' },
+  { key: '__status', label: 'وضعیت' },
+  { key: '__reviewedBy', label: 'بررسی توسط' },
   { key: '__submissionId', label: 'شناسه ثبت' },
   { key: '__jalaliDate', label: 'تاریخ ثبت (شمسی)' },
   { key: '__isoDate', label: 'زمان ثبت (ISO)' },
@@ -67,6 +69,12 @@ export function ensureHeaders(
   const existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
 
   const missingLabels: string[] = [];
+  for (const techCol of TECHNICAL_COLUMNS) {
+    if (!existingHeaders.includes(techCol.label)) {
+      missingLabels.push(techCol.label);
+    }
+  }
+
   for (const field of form.fields) {
     if (!existingHeaders.includes(field.label)) {
       missingLabels.push(field.label);
@@ -98,6 +106,8 @@ export function appendSubmissionRow(
   // Build field value mapping by label
   const labelToValueMap: Record<string, string | number> = {
     'کد رهگیری': meta.trackingCode || '',
+    'وضعیت': form.requiresApproval ? 'در انتظار بررسی' : '',
+    'بررسی توسط': '',
     'شناسه ثبت': meta.submissionId,
     'تاریخ ثبت (شمسی)': meta.jalaliDate,
     'زمان ثبت (ISO)': meta.isoDate,
@@ -323,6 +333,96 @@ export function getSubmissions(
     headers,
     submissions,
     total: submissions.length
+  };
+}
+
+export interface UpdateStatusResult {
+  ok: boolean;
+  alreadyProcessed?: boolean;
+  previousStatus?: string;
+  reviewer?: string;
+  tgUserId?: string | null;
+  message?: string;
+}
+
+/**
+ * Updates submission status ('تایید شد' | 'رد شد') and reviewer details in the form's sheet tab.
+ * Performs race-condition check: if already processed, rejects with previous status details.
+ * Colors the entire row in Google Sheets (light green for approved, light red for rejected).
+ */
+export function updateSubmissionStatus(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  trackingCode: string,
+  newStatus: 'تایید شد' | 'رد شد',
+  reviewerName: string
+): UpdateStatusResult {
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1 || lastCol === 0) {
+    return { ok: false, message: 'هیچ رکوردی در فرم یافت نشد.' };
+  }
+
+  const headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[];
+  const trackingColIdx = headerRow.findIndex((h) => h === 'کد رهگیری');
+  const statusColIdx = headerRow.findIndex((h) => h === 'وضعیت');
+  const reviewerColIdx = headerRow.findIndex((h) => h === 'بررسی توسط');
+  const tgUserColIdx = headerRow.findIndex((h) => h === 'شناسه تلگرام');
+
+  if (trackingColIdx === -1) {
+    return { ok: false, message: 'ستون کد رهگیری در شیت فرم یافت نشد.' };
+  }
+
+  const numRows = lastRow - 1;
+  const trackingColData = sheet.getRange(2, trackingColIdx + 1, numRows, 1).getValues() as (string | number)[][];
+
+  let targetRowIndex = -1;
+  for (let i = 0; i < trackingColData.length; i++) {
+    const cellVal = String(trackingColData[i]?.[0] || '').trim();
+    if (cellVal === trackingCode.trim()) {
+      targetRowIndex = i + 2; // 1-based index in sheet
+      break;
+    }
+  }
+
+  if (targetRowIndex === -1) {
+    return { ok: false, message: `درخواستی با کد رهگیری «${trackingCode}» در سیستم یافت نشد.` };
+  }
+
+  const currentStatus = statusColIdx !== -1
+    ? String(sheet.getRange(targetRowIndex, statusColIdx + 1).getValue() || '')
+    : '';
+  const currentReviewer = reviewerColIdx !== -1
+    ? String(sheet.getRange(targetRowIndex, reviewerColIdx + 1).getValue() || '')
+    : '';
+  const tgUserIdVal = tgUserColIdx !== -1
+    ? sheet.getRange(targetRowIndex, tgUserColIdx + 1).getValue()
+    : null;
+
+  if (currentStatus === 'تایید شد' || currentStatus === 'رد شد') {
+    return {
+      ok: false,
+      alreadyProcessed: true,
+      previousStatus: currentStatus,
+      reviewer: currentReviewer,
+      tgUserId: tgUserIdVal ? String(tgUserIdVal) : null
+    };
+  }
+
+  if (statusColIdx !== -1) {
+    sheet.getRange(targetRowIndex, statusColIdx + 1).setValue(newStatus);
+  }
+  if (reviewerColIdx !== -1) {
+    sheet.getRange(targetRowIndex, reviewerColIdx + 1).setValue(reviewerName);
+  }
+
+  // Row background color: light green for approved (#dcfce7), light red for rejected (#fee2e2)
+  const rowRange = sheet.getRange(targetRowIndex, 1, 1, lastCol);
+  rowRange.setBackground(newStatus === 'تایید شد' ? '#dcfce7' : '#fee2e2');
+
+  return {
+    ok: true,
+    previousStatus: currentStatus,
+    tgUserId: tgUserIdVal ? String(tgUserIdVal) : null
   };
 }
 

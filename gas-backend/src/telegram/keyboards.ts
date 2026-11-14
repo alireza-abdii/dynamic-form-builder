@@ -172,25 +172,57 @@ export function buildStatsSelectionKeyboard(forms: FormListItem[]) {
   return { inline_keyboard };
 }
 
+export interface NotificationKeyboardOptions {
+  publicBaseUrl?: string | undefined;
+  trackingCode?: string | undefined;
+  requiresApproval?: boolean | undefined;
+}
+
 /**
  * Notification message keyboard sent to admins on form submission.
+ * Includes inline Approve/Reject action buttons when requiresApproval is enabled.
  */
-export function buildNotificationKeyboard(formId: string, publicBaseUrl?: string) {
-  const buttons: Array<{ text: string; callback_data?: string; web_app?: { url: string } }> = [
+export function buildNotificationKeyboard(
+  formId: string,
+  options?: string | NotificationKeyboardOptions
+) {
+  const opts: NotificationKeyboardOptions =
+    typeof options === 'string' ? { publicBaseUrl: options } : options || {};
+
+  const rows: Array<Array<{ text: string; callback_data?: string; web_app?: { url: string } }>> = [];
+
+  // 1. Approval action buttons row (if requiresApproval is true and trackingCode exists)
+  if (opts.requiresApproval && opts.trackingCode) {
+    rows.push([
+      {
+        text: '✅ تایید درخواست',
+        callback_data: `ap:${formId}:${opts.trackingCode}`
+      },
+      {
+        text: '❌ رد درخواست',
+        callback_data: `rj:${formId}:${opts.trackingCode}`
+      }
+    ]);
+  }
+
+  // 2. Secondary action row (Excel export + Form preview)
+  const secondaryRow: Array<{ text: string; callback_data?: string; web_app?: { url: string } }> = [
     {
       text: '📥 دانلود فایل اکسل',
       callback_data: `x:${formId}`
     }
   ];
 
-  if (publicBaseUrl) {
-    buttons.push({
+  if (opts.publicBaseUrl) {
+    secondaryRow.push({
       text: '🔗 مشاهده فرم',
-      web_app: { url: `${publicBaseUrl}/f/${formId}` }
+      web_app: { url: `${opts.publicBaseUrl}/f/${formId}` }
     });
   }
 
+  rows.push(secondaryRow);
+
   return {
-    inline_keyboard: [buttons]
+    inline_keyboard: rows
   };
 }
