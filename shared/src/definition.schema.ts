@@ -17,6 +17,12 @@ export const optionItemSchema = z.object({
 });
 export type OptionItem = z.infer<typeof optionItemSchema>;
 
+export const showIfSchema = z.object({
+  field: z.string().min(1, 'شناسه فیلد مرجع الزامی است.'),
+  equals: z.string().min(1, 'مقدار تطابق شرط الزامی است.')
+});
+export type ShowIf = z.infer<typeof showIfSchema>;
+
 const baseFieldSchema = z.object({
   key: z.string().regex(/^[a-z][a-zA-Z0-9]{0,39}$/, {
     message: 'Field key must be camelCase alphanumeric starting with a lowercase letter (max 40 chars).'
@@ -25,7 +31,8 @@ const baseFieldSchema = z.object({
   required: z.boolean().optional(),
   unique: z.boolean().optional(),
   hint: z.string().optional(),
-  placeholder: z.string().optional()
+  placeholder: z.string().optional(),
+  showIf: showIfSchema.optional()
 });
 
 export const textFieldSchema = baseFieldSchema.extend({
@@ -153,6 +160,37 @@ export const formDefinitionSchema = z.object({
           message: 'حداقل تعداد انتخاب نمی‌تواند از حداکثر بیشتر باشد.',
           path: ['fields', index, 'minItems']
         });
+      }
+    }
+
+    if (field.showIf) {
+      const earlierFields = data.fields.slice(0, index);
+      const targetField = earlierFields.find((f) => f.key === field.showIf?.field);
+
+      if (!targetField) {
+        const existsLater = data.fields.some((f) => f.key === field.showIf?.field);
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: existsLater
+            ? `فیلد شرطی «${field.showIf.field}» باید قبل از فیلد فعلی قرار گیرد.`
+            : `فیلد مرجع شرط «${field.showIf.field}» در فرم یافت نشد.`,
+          path: ['fields', index, 'showIf', 'field']
+        });
+      } else if (targetField.type !== 'select' && targetField.type !== 'multiselect') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `فیلد مرجع شرط «${targetField.label}» باید از نوع انتخابی (select یا multiselect) باشد.`,
+          path: ['fields', index, 'showIf', 'field']
+        });
+      } else {
+        const optionExists = targetField.options.some((o) => o.value === field.showIf?.equals);
+        if (!optionExists) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `مقدار شرط «${field.showIf.equals}» در بین گزینه‌های فیلد مرجع «${targetField.label}» یافت نشد.`,
+            path: ['fields', index, 'showIf', 'equals']
+          });
+        }
       }
     }
   });

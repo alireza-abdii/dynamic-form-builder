@@ -304,4 +304,204 @@ describe('Dynamic Zod Schema Builder', () => {
     expect(fa.duplicateField('کد ملی', '0010359745')).toContain('0010359745');
     expect(fa.duplicateField('کد ملی', '0010359745')).toContain('امکان ثبت مجدد وجود ندارد');
   });
+
+  it('correctly evaluates field visibility using isFieldVisible', async () => {
+    const { isFieldVisible } = await import('../src/visibility.js');
+    const { textFieldSchema, selectFieldSchema } = await import('../src/definition.schema.js');
+
+    const normalField = textFieldSchema.parse({
+      key: 'normal',
+      type: 'text',
+      label: 'نام'
+    });
+
+    const conditionalField = textFieldSchema.parse({
+      key: 'illnessReason',
+      type: 'text',
+      label: 'علت بیماری',
+      showIf: {
+        field: 'leaveType',
+        equals: 'sick'
+      }
+    });
+
+    // 1. Normal field is always visible
+    expect(isFieldVisible(normalField, {})).toBe(true);
+
+    // 2. Conditional field with matching scalar value
+    expect(isFieldVisible(conditionalField, { leaveType: 'sick' })).toBe(true);
+    expect(isFieldVisible(conditionalField, { leaveType: 'daily' })).toBe(false);
+    expect(isFieldVisible(conditionalField, {})).toBe(false);
+
+    // 3. Conditional field with multiselect array
+    const multiCondField = textFieldSchema.parse({
+      key: 'extraSpecs',
+      type: 'text',
+      label: 'توضیحات تکمیلی',
+      showIf: {
+        field: 'services',
+        equals: 'custom-dev'
+      }
+    });
+
+    expect(isFieldVisible(multiCondField, { services: ['design', 'custom-dev', 'seo'] })).toBe(true);
+    expect(isFieldVisible(multiCondField, { services: ['design', 'seo'] })).toBe(false);
+    expect(isFieldVisible(multiCondField, { services: [] })).toBe(false);
+  });
+
+  it('validates conditional field schema rules in formDefinitionSchema', async () => {
+    const { formDefinitionSchema } = await import('../src/definition.schema.js');
+
+    // Valid leave form
+    const validLeaveForm = {
+      id: 'leave-request',
+      version: 1,
+      title: 'درخواست مرخصی',
+      fields: [
+        {
+          key: 'leaveType',
+          type: 'select',
+          label: 'نوع مرخصی',
+          required: true,
+          options: [
+            { value: 'daily', label: 'استحقاقی' },
+            { value: 'sick', label: 'استعلاجی' }
+          ]
+        },
+        {
+          key: 'illnessReason',
+          type: 'text',
+          label: 'علت بیماری',
+          required: true,
+          showIf: {
+            field: 'leaveType',
+            equals: 'sick'
+          }
+        }
+      ]
+    };
+    expect(formDefinitionSchema.safeParse(validLeaveForm).success).toBe(true);
+
+    // Invalid: Reference field placed AFTER dependent field
+    const invalidOrderForm = {
+      id: 'invalid-order',
+      version: 1,
+      title: 'فرم نامعتبر',
+      fields: [
+        {
+          key: 'illnessReason',
+          type: 'text',
+          label: 'علت بیماری',
+          showIf: {
+            field: 'leaveType',
+            equals: 'sick'
+          }
+        },
+        {
+          key: 'leaveType',
+          type: 'select',
+          label: 'نوع مرخصی',
+          options: [{ value: 'sick', label: 'استعلاجی' }]
+        }
+      ]
+    };
+    const orderResult = formDefinitionSchema.safeParse(invalidOrderForm);
+    expect(orderResult.success).toBe(false);
+    if (!orderResult.success) {
+      expect(orderResult.error.errors[0]?.message).toContain('باید قبل از فیلد فعلی قرار گیرد');
+    }
+
+    // Invalid: Equals value not among options
+    const invalidOptionForm = {
+      id: 'invalid-option',
+      version: 1,
+      title: 'فرم نامعتبر',
+      fields: [
+        {
+          key: 'leaveType',
+          type: 'select',
+          label: 'نوع مرخصی',
+          options: [{ value: 'daily', label: 'استحقاقی' }]
+        },
+        {
+          key: 'illnessReason',
+          type: 'text',
+          label: 'علت بیماری',
+          showIf: {
+            field: 'leaveType',
+            equals: 'sick' // does not exist in options
+          }
+        }
+      ]
+    };
+    const optionResult = formDefinitionSchema.safeParse(invalidOptionForm);
+    expect(optionResult.success).toBe(false);
+    if (!optionResult.success) {
+      expect(optionResult.error.errors[0]?.message).toContain('در بین گزینه‌های فیلد مرجع');
+    }
+  });
+
+  it('skips validation for hidden required conditional fields and enforces it when visible', async () => {
+    const leaveFormDef = {
+      id: 'leave-request',
+      version: 1,
+      title: 'درخواست مرخصی',
+      status: 'open' as const,
+      access: 'public' as const,
+      notifyAdmins: true,
+      submitLabel: 'ثبت',
+      successMessage: 'موفق',
+      fields: [
+        {
+          key: 'leaveType',
+          type: 'select' as const,
+          label: 'نوع مرخصی',
+          required: true,
+          options: [
+            { value: 'daily', label: 'استحقاقی' },
+            { value: 'sick', label: 'استعلاجی' }
+          ]
+        },
+        {
+          key: 'illnessReason',
+          type: 'text' as const,
+          label: 'علت بیماری',
+          required: true,
+          showIf: {
+            field: 'leaveType',
+            equals: 'sick'
+          }
+        }
+      ]
+    };
+
+    const schema = buildZodSchema(leaveFormDef);
+
+    // 1. When leaveType is 'daily', illnessReason is hidden -> required validation is skipped!
+    const dailySubmission = {
+      leaveType: 'daily'
+    };
+    const dailyResult = schema.safeParse(dailySubmission);
+    expect(dailyResult.success).toBe(true);
+
+    // 2. When leaveType is 'sick', illnessReason is VISIBLE -> required validation is enforced!
+    const sickWithoutReason = {
+      leaveType: 'sick'
+    };
+    const sickFailResult = schema.safeParse(sickWithoutReason);
+    expect(sickFailResult.success).toBe(false);
+    if (!sickFailResult.success) {
+      const issue = sickFailResult.error.issues.find((i) => i.path.includes('illnessReason'));
+      expect(issue).toBeDefined();
+      expect(issue?.message).toContain('علت بیماری');
+    }
+
+    // 3. When leaveType is 'sick' and illnessReason is provided -> passes!
+    const sickWithReason = {
+      leaveType: 'sick',
+      illnessReason: 'سرماخوردگی شدید و استراحت پزشکی'
+    };
+    const sickPassResult = schema.safeParse(sickWithReason);
+    expect(sickPassResult.success).toBe(true);
+  });
 });

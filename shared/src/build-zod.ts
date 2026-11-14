@@ -6,6 +6,7 @@ import { isValidIranMobile, cleanIranMobile } from './validators/iran-mobile.js'
 import { isValidNationalId } from './validators/national-id.js';
 import { isValidSheba, isValidBankCard, cleanBankInput } from './validators/iran-bank.js';
 import { parseJalaliString } from './jalali.js';
+import { isFieldVisible } from './visibility.js';
 
 export function assertNever(x: never): never {
   throw new Error(`Unexpected object: ${JSON.stringify(x)}`);
@@ -268,10 +269,40 @@ export function buildFieldZodSchema(field: FieldDefinition): z.ZodTypeAny {
   }
 }
 
-export function buildZodSchema(definition: FormDefinition): z.ZodObject<Record<string, z.ZodTypeAny>> {
+export function buildZodSchema(definition: FormDefinition): z.ZodType<Record<string, unknown>> {
   const shape: Record<string, z.ZodTypeAny> = {};
+  const hasConditional = definition.fields.some((f) => Boolean(f.showIf));
+
   for (const field of definition.fields) {
-    shape[field.key] = buildFieldZodSchema(field);
+    if (field.showIf) {
+      // Conditional fields can be omitted/empty if hidden
+      shape[field.key] = z.unknown().optional();
+    } else {
+      shape[field.key] = buildFieldZodSchema(field);
+    }
   }
-  return z.object(shape).strict();
+
+  const baseSchema = z.object(shape).strict();
+
+  if (!hasConditional) {
+    return baseSchema;
+  }
+
+  return baseSchema.superRefine((data, ctx) => {
+    const values = data as Record<string, unknown>;
+    for (const field of definition.fields) {
+      if (field.showIf && isFieldVisible(field, values)) {
+        const fieldSchema = buildFieldZodSchema(field);
+        const result = fieldSchema.safeParse(values[field.key]);
+        if (!result.success) {
+          for (const issue of result.error.issues) {
+            ctx.addIssue({
+              ...issue,
+              path: issue.path.length > 0 ? [field.key, ...issue.path] : [field.key]
+            });
+          }
+        }
+      }
+    }
+  });
 }

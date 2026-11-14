@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { useForm, type FieldValues } from 'react-hook-form';
+import { useForm, useWatch, type FieldValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import type { FormDefinition, SubmitRequest } from '@fb/shared';
-import { buildZodSchema, fa } from '@fb/shared';
+import { buildZodSchema, fa, isFieldVisible } from '@fb/shared';
 import { Form } from '@/components/ui/form';
 import { Card, CardContent } from '@/components/ui/card';
 import { FormHeader } from './FormHeader';
@@ -34,6 +34,8 @@ export function DynamicForm({ definition, onSuccess }: DynamicFormProps) {
     mode: 'onTouched',
     defaultValues: {}
   });
+
+  const watchedValues = useWatch({ control: form.control });
 
   // 3. Draft restoration & autosave
   React.useEffect(() => {
@@ -102,12 +104,20 @@ export function DynamicForm({ definition, onSuccess }: DynamicFormProps) {
 
     const honeypotInput = (document.getElementById('hp_company_field') as HTMLInputElement)?.value;
 
+    // Strip values of hidden fields so stale inputs are not persisted
+    const activeValues: Record<string, unknown> = {};
+    for (const field of definition.fields) {
+      if (isFieldVisible(field, values as Record<string, unknown>)) {
+        activeValues[field.key] = values[field.key];
+      }
+    }
+
     const request: SubmitRequest = {
       action: 'submit',
       formId: definition.id,
       formVersion: definition.version,
       submissionId: crypto.randomUUID(),
-      values,
+      values: activeValues,
       meta: {
         source: isTma ? 'telegram' : 'web',
         initData: initData || undefined,
@@ -182,9 +192,22 @@ export function DynamicForm({ definition, onSuccess }: DynamicFormProps) {
 
             {/* Field renderers */}
             <div className="space-y-5">
-              {definition.fields.map((field) => (
-                <FieldRenderer key={field.key} field={field} />
-              ))}
+              {definition.fields.map((field) => {
+                const isVisible = isFieldVisible(
+                  field,
+                  (watchedValues || {}) as Record<string, unknown>
+                );
+                if (!isVisible) return null;
+
+                return (
+                  <div
+                    key={field.key}
+                    className="animate-in fade-in slide-in-from-top-1 duration-200"
+                  >
+                    <FieldRenderer field={field} />
+                  </div>
+                );
+              })}
             </div>
 
             {/* Submit Bar */}

@@ -14,7 +14,8 @@ import {
   AlertCircle,
   HelpCircle,
   Link2,
-  Share2
+  Share2,
+  GitFork
 } from 'lucide-react';
 import { formDefinitionSchema, toPersianDigits, normalizeDigits, type FormDefinition, type FieldDefinition, type FormSummary, type Preset, type Currency } from '@fb/shared';
 import { getForm, saveForm, listForms } from '@/lib/api/gas-client';
@@ -166,8 +167,17 @@ export function FormBuilderPage() {
   };
 
   const removeField = (index: number) => {
+    const removedKey = form.fields[index]?.key;
     setForm((prev) => {
-      const copy = prev.fields.filter((_, i) => i !== index);
+      const copy = prev.fields
+        .filter((_, i) => i !== index)
+        .map((f) => {
+          if (f.showIf && f.showIf.field === removedKey) {
+            const { showIf: _unused, ...rest } = f;
+            return rest as FieldDefinition;
+          }
+          return f;
+        });
       return { ...prev, fields: copy };
     });
   };
@@ -517,6 +527,11 @@ export function FormBuilderPage() {
                         {field.unique && (
                           <Badge variant="outline" className="text-[10px] text-purple-700 dark:text-purple-300 border-purple-300 bg-purple-50 dark:bg-purple-950/40">
                             یکتا
+                          </Badge>
+                        )}
+                        {field.showIf && (
+                          <Badge variant="outline" className="text-[10px] text-amber-700 dark:text-amber-300 border-amber-300 bg-amber-50 dark:bg-amber-950/40">
+                            شرطی ({field.showIf.field}={field.showIf.equals})
                           </Badge>
                         )}
                       </div>
@@ -900,6 +915,140 @@ export function FormBuilderPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Conditional Display (Show If) Section */}
+                    <div className="pt-2 border-t border-border/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                          <GitFork className="w-3.5 h-3.5 text-primary" />
+                          <span>نمایش شرطی فیلد (وابستگی به پاسخ قبلی)</span>
+                        </div>
+
+                        {field.showIf && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const { showIf: _unused, ...rest } = field;
+                              updateField(idx, rest as FieldDefinition);
+                            }}
+                            className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/10"
+                          >
+                            حذف شرط
+                          </Button>
+                        )}
+                      </div>
+
+                      {(() => {
+                        const earlierSelectFields = form.fields
+                          .slice(0, idx)
+                          .filter((f): f is Extract<FieldDefinition, { type: 'select' | 'multiselect' }> => f.type === 'select' || f.type === 'multiselect');
+
+                        if (earlierSelectFields.length === 0) {
+                          return (
+                            <p className="text-[11px] text-muted-foreground bg-muted/30 p-2.5 rounded-lg border border-dashed border-border">
+                              💡 برای فعال‌سازی نمایش شرطی، ابتدا یک فیلد انتخابی (تک‌انتخابی یا چندانتخابی) بالاتر از این فیلد قرار دهید.
+                            </p>
+                          );
+                        }
+
+                        const currentRefKey = field.showIf?.field || '';
+                        const currentRefField = earlierSelectFields.find((f) => f.key === currentRefKey);
+                        const isConditionActive = Boolean(field.showIf);
+
+                        return (
+                          <div className="space-y-3 bg-muted/20 p-3 rounded-xl border border-border/70">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={`cond_enable_${idx}`}
+                                checked={isConditionActive}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    const firstField = earlierSelectFields[0]!;
+                                    const firstOpt = firstField.options[0]?.value || '';
+                                    updateField(idx, {
+                                      ...field,
+                                      showIf: { field: firstField.key, equals: firstOpt }
+                                    });
+                                  } else {
+                                    const { showIf: _unused, ...rest } = field;
+                                    updateField(idx, rest as FieldDefinition);
+                                  }
+                                }}
+                                className="rounded border-input text-primary w-4 h-4 cursor-pointer"
+                              />
+                              <Label htmlFor={`cond_enable_${idx}`} className="text-xs cursor-pointer font-medium">
+                                این فیلد فقط در صورت انتخاب یک گزینه خاص در فیلدهای قبلی نمایش داده شود
+                              </Label>
+                            </div>
+
+                            {isConditionActive && (
+                              <div className="grid gap-3 sm:grid-cols-2 pt-1">
+                                <div className="space-y-1">
+                                  <Label className="text-xs">فیلد مبدأ شرط (فقط گزینه‌ای‌های بالاتر) *</Label>
+                                  <Select
+                                    value={currentRefKey}
+                                    onValueChange={(selectedFieldKey) => {
+                                      const targetF = earlierSelectFields.find((f) => f.key === selectedFieldKey);
+                                      const firstOpt = targetF?.options[0]?.value || '';
+                                      updateField(idx, {
+                                        ...field,
+                                        showIf: { field: selectedFieldKey, equals: firstOpt }
+                                      });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9 text-xs">
+                                      <SelectValue placeholder="انتخاب فیلد..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {earlierSelectFields.map((sf) => (
+                                        <SelectItem key={sf.key} value={sf.key}>
+                                          {sf.label} ({sf.key})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <Label className="text-xs">نمایش در صورت انتخاب گزینه *</Label>
+                                  {currentRefField && currentRefField.options.length > 0 ? (
+                                    <Select
+                                      value={field.showIf?.equals || ''}
+                                      onValueChange={(selectedOptVal) => {
+                                        if (field.showIf) {
+                                          updateField(idx, {
+                                            ...field,
+                                            showIf: { ...field.showIf, equals: selectedOptVal }
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9 text-xs">
+                                        <SelectValue placeholder="انتخاب گزینه مورد نظر..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {currentRefField.options.map((opt) => (
+                                          <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label} ({opt.value})
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <div className="h-9 px-3 flex items-center text-xs text-destructive bg-destructive/10 rounded-xl border border-destructive/20">
+                                      فیلد انتخابی مبدأ هیچ گزینه‌ای ندارد!
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </Card>
                 ))}
               </div>

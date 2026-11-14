@@ -2,7 +2,7 @@
  * Google Sheets Data Access Layer.
  */
 import type { FormDefinition, SubmitRequest } from '@fb/shared';
-import { normalizeDigits } from '@fb/shared';
+import { normalizeDigits, isFieldVisible } from '@fb/shared';
 
 export interface BaseSubmissionMeta {
   submissionId: string;
@@ -107,6 +107,11 @@ export function appendSubmissionRow(
   };
 
   for (const field of form.fields) {
+    if (!isFieldVisible(field, req.values as Record<string, unknown>)) {
+      labelToValueMap[field.label] = '';
+      continue;
+    }
+
     const rawVal = req.values[field.key];
     if (rawVal === undefined || rawVal === null) {
       labelToValueMap[field.label] = '';

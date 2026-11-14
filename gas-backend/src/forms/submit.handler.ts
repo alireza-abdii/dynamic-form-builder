@@ -9,7 +9,8 @@ import {
   getTodayJalali,
   toPersianDigits,
   formatCurrency,
-  generateTrackingCode
+  generateTrackingCode,
+  isFieldVisible
 } from '@fb/shared';
 import { getScriptConfig } from '../config';
 import { withScriptLock } from '../utils/lock';
@@ -98,7 +99,7 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
 
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
-    const formatted = parsed.error.format() as Record<string, { _errors: string[] }>;
+    const formatted = parsed.error.format() as unknown as Record<string, { _errors: string[] }>;
 
     for (const [key, val] of Object.entries(formatted)) {
       if (key !== '_errors' && val?._errors?.length) {
@@ -116,6 +117,9 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
 
   // 6.1. Server-side validation for reference fields against source data
   for (const field of form.fields) {
+    if (!isFieldVisible(field, req.values as Record<string, unknown>)) {
+      continue;
+    }
     if (field.type === 'reference') {
       const val = req.values[field.key];
       if (val !== undefined && val !== null && val !== '') {
@@ -165,6 +169,9 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
 
     // 8.1. Unique field check against existing rows in sheet
     for (const field of form.fields) {
+      if (!isFieldVisible(field, req.values as Record<string, unknown>)) {
+        continue;
+      }
       if (field.unique) {
         const val = req.values[field.key];
         if (val !== undefined && val !== null && val !== '') {
