@@ -6,6 +6,7 @@ import { normalizeDigits } from '@fb/shared';
 
 export interface BaseSubmissionMeta {
   submissionId: string;
+  trackingCode?: string | undefined;
   jalaliDate: string;
   isoDate: string;
   source: string;
@@ -14,6 +15,7 @@ export interface BaseSubmissionMeta {
 }
 
 export const TECHNICAL_COLUMNS = [
+  { key: '__trackingCode', label: 'کد رهگیری' },
   { key: '__submissionId', label: 'شناسه ثبت' },
   { key: '__jalaliDate', label: 'تاریخ ثبت (شمسی)' },
   { key: '__isoDate', label: 'زمان ثبت (ISO)' },
@@ -95,6 +97,7 @@ export function appendSubmissionRow(
 
   // Build field value mapping by label
   const labelToValueMap: Record<string, string | number> = {
+    'کد رهگیری': meta.trackingCode || '',
     'شناسه ثبت': meta.submissionId,
     'تاریخ ثبت (شمسی)': meta.jalaliDate,
     'زمان ثبت (ISO)': meta.isoDate,
@@ -154,6 +157,7 @@ export function appendSubmissionRow(
       header.includes('کد ملی') ||
       header.includes('شماره همراه') ||
       header.includes('شناسه') ||
+      header.includes('رهگیری') ||
       header.includes('تلفن') ||
       header.includes('شبا') ||
       header.includes('کارت') ||

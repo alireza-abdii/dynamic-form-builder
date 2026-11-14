@@ -8,7 +8,8 @@ import {
   formatJalaliString,
   getTodayJalali,
   toPersianDigits,
-  formatCurrency
+  formatCurrency,
+  generateTrackingCode
 } from '@fb/shared';
 import { getScriptConfig } from '../config';
 import { withScriptLock } from '../utils/lock';
@@ -156,6 +157,7 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
 
   // 8. Thread-safe write to Google Sheets with Unique field validation
   const isoDateStr = new Date().toISOString();
+  const trackingCode = generateTrackingCode();
 
   const writeResult = withScriptLock<ApiResponse | null>(() => {
     const ss = openSpreadsheet(cfg.spreadsheetId);
@@ -185,6 +187,7 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
 
     appendSubmissionRow(sheet, form, req, {
       submissionId: req.submissionId,
+      trackingCode,
       jalaliDate: todayJalaliStr,
       isoDate: isoDateStr,
       source: req.meta.source,
@@ -218,6 +221,7 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
       const alertMessage = `🔔 <b>ثبت پاسخ جدید در سامانه</b>\n` +
         `━━━━━━━━━━━━━━━━━━\n` +
         `📋 <b>فرم:</b> «${escapeHtml(form.title)}»\n` +
+        `🔖 <b>کد رهگیری:</b> <code>${escapeHtml(trackingCode)}</code>\n` +
         `📅 <b>زمان ثبت:</b> ${toPersianDigits(todayJalaliStr)}\n` +
         `🌐 <b>بستر ثبت:</b> ${req.meta.source === 'telegram' ? '📱 مینی‌اپ تلگرام' : '💻 وب‌سایت'}\n` +
         (verifiedUser ? `👤 <b>کاربر تلگرام:</b> ${escapeHtml(verifiedUser.first_name)} (@${verifiedUser.username || '-'})\n` : '') +
@@ -235,7 +239,9 @@ export function handleFormSubmission(req: SubmitRequest): ApiResponse {
 
   return {
     ok: true,
-    submissionId: req.submissionId
+    submissionId: req.submissionId,
+    trackingCode,
+    message: form.successMessage || 'اطلاعات با موفقیت ثبت گردید.'
   };
 }
 

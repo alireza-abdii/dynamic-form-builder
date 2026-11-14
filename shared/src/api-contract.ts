@@ -22,7 +22,9 @@ export type SubmitRequest = z.infer<typeof submitRequestSchema>;
 export const apiSuccessResponseSchema = z.object({
   ok: z.literal(true),
   submissionId: z.string(),
-  duplicate: z.boolean().optional()
+  trackingCode: z.string().optional(),
+  duplicate: z.boolean().optional(),
+  message: z.string().optional()
 });
 
 export const apiErrorResponseSchema = z.object({

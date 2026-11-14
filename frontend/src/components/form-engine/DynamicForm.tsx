@@ -131,7 +131,14 @@ export function DynamicForm({ definition, onSuccess }: DynamicFormProps) {
         if (onSuccess) {
           onSuccess();
         } else {
-          navigate(`/f/${definition.id}/done`);
+          navigate(`/f/${definition.id}/done`, {
+            state: {
+              trackingCode: result.trackingCode,
+              submissionId: result.submissionId,
+              successMessage: definition.successMessage,
+              formTitle: definition.title
+            }
+          });
         }
       } else {
         haptics.notification('error');

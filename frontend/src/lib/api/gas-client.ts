@@ -4,7 +4,8 @@ import {
   type FormDefinition,
   type FormSummary,
   apiResponseSchema,
-  fa
+  fa,
+  generateTrackingCode
 } from '@fb/shared';
 
 const GAS_URL = (import.meta.env.VITE_GAS_URL as string) || '';
@@ -144,7 +145,9 @@ export async function submitForm(
     await new Promise((resolve) => setTimeout(resolve, 800));
     return {
       ok: true,
-      submissionId: req.submissionId
+      submissionId: req.submissionId,
+      trackingCode: generateTrackingCode(),
+      message: 'اطلاعات شما با موفقیت در سامانه ثبت شد.'
     };
   }
 
